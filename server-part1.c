@@ -295,7 +295,7 @@ int loop_and_listen_1() {
   }
 }
 
-int run_server_1() {
+int run_server_1(int blocking) {
   // Load database
   head = tail = temp_node = NULL;
   // _T = NULL;
