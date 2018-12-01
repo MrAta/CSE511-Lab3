@@ -10,8 +10,9 @@ OBJECTS= server-main.o \
 			c1.o \
 			c0.o \
 			journal.o \
-			server-part1.o
-TEST_TARGETS= c1unit
+			server-part1.o \
+			abd.o
+TEST_TARGETS=abdunit
 
 all: $(TARGETS)
 
@@ -23,7 +24,7 @@ test: $(TEST_TARGETS)
 server: $(OBJECTS)
 	$(LINK) $(LINKFLAGS) $^ $(LINKLIBS) -o $@
 
-c1unit: c1_unit.c c1.o
+abdunit: abd_unit.c server-part1.o c1.o c0.o cache.o journal.o abd.o
 	$(CC) $(LINKFLAGS) $^ $(LINKLIBS) -o $@
 
 client: client.c
@@ -51,4 +52,4 @@ client8: client8.c
 	gcc -g -std=gnu99 client8.c -o client8 -pthread -lm
 
 clean:
-	rm server client *.o c1unit client2 client3 client4 client5 client6 client7 client8
+	rm server client *.o abdunit client2 client3 client4 client5 client6 client7 client8

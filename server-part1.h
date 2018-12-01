@@ -20,7 +20,7 @@
 #include <time.h>
 #include <errno.h>
 #include "c1.h"
-// #include "db.h"
+ #include "abd.h"
 
 #define PORT 8086
 #define QUEUED_CONNECTIONS 5
@@ -46,7 +46,7 @@ int loop_and_listen_1();
  * @param blocking 1 if run the servers with ABD protocol
  * @return 0 if success 1 if failure
  */
-int run_server_1(int blocking);
+int run_server_1(int make_blocking);
 
 /**
  * Setup signal mask for helper threads (blocking handler) then call server helper
@@ -98,6 +98,36 @@ int server_1_delete_request(char *key, char **ret_buffer, int *ret_size);
  */
 int server_1_insert_request(char *key, char *value, char **ret_buffer, int *ret_size);
 
+/*********************** ABD Algorithm *******************/
+/**
+ *
+ * @param key
+ * @param value
+ * @param tag
+ * @param response
+ * @param response_size
+ */
+int server_1_put_request_abd(char *key, char *value, abd_tag_t *tag, char **response,
+                             int *response_size);
 
+/**
+ *
+ * @param key
+ * @param value
+ * @param tag
+ * @param response
+ * @param response_size
+ */
+int server_1_insert_request_abd(char *key, char *value, abd_tag_t *tag, char **response,
+                                int *response_size);
+
+/**
+ *
+ * @param key
+ * @param tag
+ * @param response
+ * @param response_size
+ */
+int server_1_delete_request_abd(char *key, abd_tag_t *tag, char **response, int *response_size);
 
 #endif //P1_CSRF_SERVER_PART1_H
