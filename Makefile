@@ -1,17 +1,22 @@
 LINK=gcc
 CC=gcc
-CFLAGS=-c -g3 -ggdb -std=gnu99 -Wall -I. -I/opt/local/include
-LINKFLAGS=-L. -g3 -ggdb -std=gnu99 -pthread -L/opt/local/lib
+CFLAGS=-c -g3 -ggdb -std=gnu99 -fPIC -Wall -I. -I/opt/local/include
+LINKFLAGS=-L. -g3 -ggdb -std=gnu99 -pthread -L/opt/local/lib -L./libapr/lib
 LIBFLAGS=-shared -Wall -pthread
-LINKLIBS=-lm -lrt
-TARGETS=server client
+LINKLIBS=-lm -lrt -lds -lapr-2
+ARCHIVE=ar
+TARGETS=server client client_blocking
 OBJECTS= server-main.o \
 			cache.o \
 			c1.o \
 			c0.o \
 			journal.o \
 			server-part1.o \
+			client_common.o \
 			abd.o
+LIBDS_OBJS = dslib/dict.o \
+				dslib/pqueue.o
+LIBS = libds.a
 TEST_TARGETS=abdunit
 
 all: $(TARGETS)
@@ -27,8 +32,15 @@ server: $(OBJECTS)
 abdunit: abd_unit.c server-part1.o c1.o c0.o cache.o journal.o abd.o
 	$(CC) $(LINKFLAGS) $^ $(LINKLIBS) -o $@
 
+libds.a: $(LIBDS_OBJS)
+	$(ARCHIVE) rc $@ $^
+	$(ARCHIVE) s $@ $^
+
 client: client.c
 	gcc -g -std=gnu99 client.c -o client -pthread -lm
+
+client_blocking: client_blocking.o client_common.o $(LIBS)
+	$(LINK) $(LINKFLAGS) $^ $(LINKLIBS) -o $@
 
 client7: client7.c
 	gcc -g -std=gnu99 client7.c -o client7 -pthread -lm
@@ -52,4 +64,4 @@ client8: client8.c
 	gcc -g -std=gnu99 client8.c -o client8 -pthread -lm
 
 clean:
-	rm server client *.o abdunit client2 client3 client4 client5 client6 client7 client8
+	rm server client *.o abdunit client2 client3 client4 client5 client6 client7 client8 libds.a
