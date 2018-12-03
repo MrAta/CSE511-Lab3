@@ -1,6 +1,6 @@
 LINK=gcc
 CC=gcc
-CFLAGS=-c -g3 -ggdb -std=gnu99 -fPIC -Wall -I. -I/opt/local/include
+CFLAGS=-c -g3 -ggdb -std=gnu99 -fPIC -Wall -I. -I/opt/local/include -I./libapr/include/apr-2
 LINKFLAGS=-L. -g3 -ggdb -std=gnu99 -pthread -L/opt/local/lib -L./libapr/lib
 LIBFLAGS=-shared -Wall -pthread
 LINKLIBS=-lm -lrt -lds -lapr-2
@@ -39,7 +39,7 @@ libds.a: $(LIBDS_OBJS)
 client: client.c
 	gcc -g -std=gnu99 client.c -o client -pthread -lm
 
-client_blocking: client_blocking.o client_common.o $(LIBS)
+client_blocking: blocking_node.o $(LIBS)
 	$(LINK) $(LINKFLAGS) $^ $(LINKLIBS) -o $@
 
 client7: client7.c

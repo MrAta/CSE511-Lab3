@@ -123,4 +123,9 @@ int listen_client_connections(int port) {
   }
 }
 
+void *client_message_listen(void * param) {
+  return NULL;
+}
 
+int main() {
+}

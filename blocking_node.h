@@ -15,12 +15,15 @@
 #include <pthread.h>
 #include <math.h>
 #include "apr/include/apr_queue.h"
-#include "client_common.h"
-#define PORT 8086
 #define MAX_CLIENTS 10
 #define QUEUED_CONNECTIONS 5
-pthread_mutex_t fp_mutex;
-
+/**
+ * NOTE: In order to link against the apr library perform the following steps:
+ * - Build the library as required by your system
+ * - Get the built lib folder and ensure it exists in the current directory
+ *      as libapr
+ * - Set the environment variable LD_LIBRARY_PATH to the libapr/lib path
+ */
 extern apr_queue_t *channel;
 extern apr_pool_t *allocator;
 
@@ -67,7 +70,7 @@ int listen_client_connections(int port);
 /**
  * Client listener thread function
  */
-void *client_message_listen(void *);
+void *client_message_listen(void *); // TODO: Define functionality
 
 int broadcast_message(); // TODO: Define properly
 
