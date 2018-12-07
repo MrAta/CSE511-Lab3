@@ -113,7 +113,7 @@ int server_1_put_request(char *key, char *value, char **ret_buffer, int *ret_siz
 }
 
 int server_1_put_request_abd(char *key, char *value, abd_tag_t *tag, char **response,
-                              int *response_size) {
+                             int *response_size) {
   //
   //
   // LOCAL VARIABLES
@@ -128,11 +128,11 @@ int server_1_put_request_abd(char *key, char *value, abd_tag_t *tag, char **resp
     // TODO: Handle Error
     exit(1);
   }
-  sscanf(search_buffer, "%s %d %d", value, &search_tag.tag, &search_tag.client_id);
+  sscanf(search_buffer, "%s %d %d", value, &search_tag.timestamp, &search_tag.client_id);
   if (abd_tag_cmp(tag, &search_tag) == 1) {
     // Make value change
     free(search_buffer);
-    snprintf(new_value, MAX_VALUE_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", value, tag->tag,
+    snprintf(new_value, MAX_VALUE_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", value, tag->timestamp,
              tag->client_id);
     return server_1_put_request(key, new_value, response, response_size);
   }
@@ -184,7 +184,7 @@ int server_1_insert_request(char *key, char *value, char **ret_buffer, int *ret_
 }
 
 int server_1_insert_request_abd(char *key, char *value, abd_tag_t *tag, char **response,
-                                 int *response_size) {
+                                int *response_size) {
   //
   //
   // LOCAL VARIABLES
@@ -199,11 +199,12 @@ int server_1_insert_request_abd(char *key, char *value, abd_tag_t *tag, char **r
     // TODO: Handle Error
     exit(1);
   }
-  sscanf(search_buffer, "%s %d %d", value, &search_tag.tag, &search_tag.client_id);
+  sscanf(search_buffer, "%s %d %d", value, &search_tag.timestamp, &search_tag.client_id);
   if (abd_tag_cmp(tag, &search_tag) == 1) {
     // Make value change
     free(search_buffer);
-    snprintf(new_value, MAX_VALUE_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", value, tag->tag, tag->client_id);
+    snprintf(new_value, MAX_VALUE_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", value, tag->timestamp,
+             tag->client_id);
     return server_1_insert_request(key, new_value, response, response_size);
   }
   // Send Ack to client
@@ -426,6 +427,10 @@ int run_server_1(int make_blocking) {
   c1_init();
 
   blocking = make_blocking;
+  if (blocking) {
+    initialize_blocking_node();
+
+  }
   if (loop_and_listen_1()) {
     return EXIT_FAILURE;
   }

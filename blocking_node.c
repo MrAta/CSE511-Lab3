@@ -62,12 +62,12 @@ int connect_peer(char *ip, int port) {
   attribute = malloc(sizeof(listener_attr_t));
   attribute->socket = sock;
   attribute->channel = channel;
-  pthread_create(&listener_thread, NULL, client_message_listen, (void *) attribute);
+  pthread_create(&listener_thread, NULL, peer_message_listen, (void *) attribute);
   connected_socks[connected_clients++] = sock;
   return 0;
 }
 
-int listen_client_connections(int port) {
+int listen_peer_connections(int port) {
   //
   //
   // LOCAL VARIABLES
@@ -115,7 +115,7 @@ int listen_client_connections(int port) {
     attribute->socket = newsockfd;
     attribute->channel = channel;
     pthread_t *handler_thread = (pthread_t *) malloc(sizeof(pthread_t));
-    if (pthread_create(handler_thread, NULL, client_message_listen, (void *) attribute) != 0) {
+    if (pthread_create(handler_thread, NULL, peer_message_listen, (void *) attribute) != 0) {
       perror("Could not start handler");
       continue;
     }
@@ -123,8 +123,16 @@ int listen_client_connections(int port) {
   }
 }
 
-void *client_message_listen(void * param) {
+void *peer_message_listen(void *param) {
   return NULL;
+}
+
+int distributed_lock() {
+  return 0;
+}
+
+int distributed_unlock() {
+  return 0;
 }
 
 int main() {

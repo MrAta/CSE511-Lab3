@@ -8,7 +8,7 @@
 #include <stdint.h>
 
 typedef struct {
-  uint32_t tag;
+  uint32_t timestamp;
   uint32_t client_id;
 } abd_tag_t;
 
