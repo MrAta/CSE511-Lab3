@@ -197,6 +197,7 @@ int distributed_lock() {
 //    printf("Could not marshall message\n");
 //    return 1;
 //  }
+  update_timestamp(timestamp + 1);
   for (int i = 0; i < connected_clients; i++) {
     if (send_lock_request(msg, connected_socks[i])) {
       printf("Could not send lock request to node: %d\n", i);
@@ -247,6 +248,7 @@ int distributed_unlock() {
 //    printf("Could not marshall message\n");
 //    return 1;
 //  }
+  update_timestamp(timestamp + 1);
   for (int i = 0; i < connected_clients; i++) {
     if (send_lock_request(msg, connected_socks[i])) {
       printf("Could not send lock request to node: %d\n", i);
@@ -269,8 +271,7 @@ int handle_lock_request(lock_message_t *message) {
   // LOCAL VARIABLES
   //
   //
-
-
+  update_timestamp(message->timestamp + 1);
   switch (message->request_type) {
     case REQUEST:
       return perform_dist_lock(message);
@@ -308,6 +309,7 @@ int perform_dist_lock(lock_message_t *incoming_message) {
     sem_wait(sem[incoming_message->client_id]);
     sem_post(sem[incoming_message->client_id]);
   }
+  update_timestamp(timestamp + 1);
   // REPLY
   outgoing_message = malloc(sizeof(lock_message_t));
   outgoing_message->client_id = node_id;
@@ -317,6 +319,10 @@ int perform_dist_lock(lock_message_t *incoming_message) {
   send_lock_request(incoming_message, connected_socks[incoming_message->client_id]);
 
   return 0;
+}
+
+void update_timestamp(uint32_t new_timestamp) {
+  timestamp = timestamp > new_timestamp ? timestamp : new_timestamp;
 }
 
 int main() {

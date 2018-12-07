@@ -150,6 +150,7 @@ int handle_server_write_request(char *key, char *value);
  */
 int initialize_blocking_node();
 
+void update_timestamp(uint32_t new_timestamp);
 
 /************** DATA STRUCTURE FUNCTIONS **************/
 // TODO: @Quinn implement
