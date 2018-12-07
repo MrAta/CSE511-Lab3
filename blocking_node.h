@@ -40,9 +40,12 @@ typedef struct {
 } listener_attr_t;
 
 typedef enum {
-  REQUEST,
-  RELEASE,
-  REPLY,
+  REQUEST, // Requests a lock
+  RELEASE, // Releases a lock
+  REPLY, // Reply to a lock request
+  SERVER_WRITE // Server write request. This message type should have no
+               // locking effect at all. This request type should only be
+               // sent when a lock is held.
 } lock_request_t;
 
 typedef struct {
@@ -134,6 +137,25 @@ int handle_lock_request(lock_message_t *message);
  * @return 0 if successfully unlocked, 1 if failed.
  */
 int distributed_unlock();
+
+// TODO: @Quinn Implement
+/**
+ * This function writes the key and value to its own persistent store
+ * and broadcasts it out to all other nodes
+ * @param key Key to write for
+ * @param value The value associated with key
+ * @return 0 if successful; 1 if failed.
+ */
+int server_write_request(char *key, char *value);
+
+// TODO: Quinn Implement
+/**
+ * Handle an incoming write request from a server that holds the lock
+ * @param key Key to write value for
+ * @param value Value associated with the key
+ * @return 0 if successful; 1 if failed.
+ */
+int handle_server_write_request(char *key, char *value);
 
 /**
  * Runs any initializing needed for a type II node.
