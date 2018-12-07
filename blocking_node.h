@@ -14,9 +14,11 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <math.h>
+#include <semaphore.h>
 #include "apr/include/apr_queue.h"
 #include "dslib/pqueue.h"
 #include "abd.h"
+#include "data_types.h"
 
 #define MAX_CLIENTS 10
 #define QUEUED_CONNECTIONS 5
@@ -29,33 +31,13 @@
  */
 extern apr_queue_t *channel;
 extern apr_pool_t *allocator;
-extern pqueue lock_queue;
+extern pqueue *lock_queue;
 extern uint32_t timestamp;
 // TODO: @Quinn Add this to the command line args
 extern uint32_t node_id;
 
-typedef struct {
-  int socket;
-  apr_queue_t *channel;
-} listener_attr_t;
-
-typedef enum {
-  REQUEST, // Requests a lock
-  RELEASE, // Releases a lock
-  REPLY, // Reply to a lock request
-  SERVER_WRITE // Server write request. This message type should have no
-               // locking effect at all. This request type should only be
-               // sent when a lock is held.
-} lock_request_t;
-
-typedef struct {
-  uint32_t timestamp;
-  uint32_t client_id;
-  lock_request_t request_type;
-} lock_message_t;
-
-int connected_socks[MAX_CLIENTS];
-int connected_clients;
+extern int connected_socks[MAX_CLIENTS];
+extern int connected_clients;
 
 /**
  * Creates a TCP connection to a server as specified
@@ -129,6 +111,11 @@ int send_lock_request(lock_message_t *message, int sock);
  * @return 0 if success; 1 if failure
  */
 int handle_lock_request(lock_message_t *message);
+
+/**
+ * Takes the needed action upon receiving a REQUEST message type.
+ */
+int perform_dist_lock(lock_message_t *incoming_message);
 
 /**
  * Sends an unlocking request to the rest of the nodes in the swarm
