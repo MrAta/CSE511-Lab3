@@ -46,17 +46,4 @@ void cache_put (char *name, char *defn);
  */
 void cache_invalidate(char *key);
 
-/**
- * An implementation of ABD read protocol
- * @param name The key to get
- */
-void abd_read(char *key);
-
-/**
- * An implementation of ABD write protocol
- * @param name The key to write
- * @param name The value for the given key
- * @param name The current timestamp for the client
- */
-void abd_write(char *key, char * value, long timestamp);
 #endif //P1_CSRF_CACHE_H

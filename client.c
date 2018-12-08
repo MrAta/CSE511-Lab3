@@ -7,9 +7,12 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <pthread.h>
+#include<semaphore.h>
 #include <math.h>
 #include <time.h>
 #include <string.h>
+#include "abd.h"
+#include "common.h"
 // #define TARGET_ADDR "172.17.0.2"
 #define TARGET_ADDR "127.0.0.1"
 #define PORT 8086
@@ -22,16 +25,21 @@
 #define NUM_THREADS 25
 #define NUM_OPS 10000//total number of operation for workload
 double zeta = 0.0; //zeta fixed for zipf
+#define NUM_NODES 3
+char * NODES = {"127.0.0.1", "127.0.0.2", "127.0.0.3"}
 char * keys[N_KEY] = {NULL};
 // char * values[N_KEY] = {NULL};
 double popularities[N_KEY];
 double cdf[N_KEY];
 int arr_rate = 100;
 int arr_type = 1;
-struct sockaddr_in *serv_addr;
-pthread_mutex_t fp_mutex;
-FILE *fp;
 
+pthread_mutex_t fp_mutex;
+pthread_mutex_t lrq_m;
+sem_t rq_sem;
+FILE *fp;
+char * nodes[NUM_NODES] = {"127.0.0.1", "127.0.0.2", "127.0.0.3"}
+struct sockaddr_in *serv_addrs[NUM_NODES];
 static char *rand_string(char *str, size_t size)
 {
   // int seed = time(NULL);
@@ -231,6 +239,115 @@ void *client_func() {
   return (void *) gbg;
 }
 
+
+/**
+ * Read Query to nodes for (t,v)
+ * @param name The key to get
+ */
+void *send_abd_read_query(void * arg){
+   rq_arg * arg = (rq_arg *)(arg);
+   int i = arg->node_id;
+   int sock = 0, valread;
+   char *gbg;
+
+   char buffer[MAX_ENTRY_SIZE] = {0};
+
+   if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+   {
+       printf("\n Socket creation error \n");
+       exit(0);
+   }
+
+   if (connect(sock, (struct sockaddr *)serv_addrs[i], sizeof(struct sockaddr_in)) < 0)
+   {
+       printf("\nConnection Failed \n");
+       exit(0);
+   }
+   char cmd[MAX_ENTRY_SIZE] = "";
+   char * _cmd = "GET ";
+   strcat(cmd, _cmd);
+   strcat(cmd, key);   //read response
+   send(sock, cmd, strlen(cmd), 0);
+   valread = read(sock, buffer, MAX_ENTRY_SIZE);
+   if(valread == 0){
+     printf("Socket closed\n");
+     close(sock);
+     return (void *) gbg;
+   }
+   pthread_mutex_lock(&lrq_m);
+   char * save_ptr;
+   char *  req_str = (char *) malloc(MAX_ENTRY_SIZE * sizeof(char));
+   strcpy(req_str, buffer);
+
+   //parse valread
+   char * v = NULL;
+   v = strtok_r(req_str, " ", &save_ptr);
+   strcpy(arg->value, v);
+   //abd_tag_t * tag = malloc(sizeof(*tag));
+   tag->tag = atoi(strtok_r(req_str, " ", &save_ptr);)
+   tag->client_id = atoi(strtok_r(req_str, " ", &save_ptr);)
+   if(abd_tag_cmp(tag, arg->tag))
+        arg->tag = tag;
+
+   pthread_mutex_unlock(&lrq_m);
+   sem_post(&rq_sem);
+ }
+/**
+ * Read Query to nodes for (t,v)
+ * @param name The key to get
+ */
+void abd_read_query(char *key){
+  pthread_t query_thread[NUM_NODES];
+  rq_arg * arg = malloc(sizeof(*arg));
+  arg->value = malloc(sizeof(char)*MAX_VALUE_SIZE);
+  arg->tag = malloc(sizeof(abd_tag_t));
+  arg->tag->client_id = CLIENT_ID;
+  arg->tag->tag = 0;
+  for (int i=0; i < NUM_NODES; i++){
+      pthread_mutex_lock(&lrq_m);
+      arg->node_id = i;
+      pthread_mutex_unlock(&lrq_m);
+    pthread_create(&query_thread[i], NULL, send_abd_read_query, (void*)arg);
+  }
+  int sem_val;
+  sem_getvalue(&rq_sem, &sem_val);
+  while (sem_val < (int)NUM_NODES/2 + 1) {
+    sem_getvalue(&rq_sem, &sem_val);
+  }
+  //TODO: force threads to Finished
+  //TODO: reset the semaphore value
+}
+/**
+ * An implementation of ABD read protocol
+ * @param name The key to get
+ */
+void abd_read(char *key){
+
+}
+
+/**
+ * An implementation of ABD write protocol
+ * @param name The key to write
+ * @param name The value for the given key
+ * @param name The current timestamp for the client
+ */
+void abd_write(char *key, char * value, long timestamp);
+void setup_server_addr(int i, char * target_addr){
+
+  serv_addrs[i] = (struct sockaddr_in*) malloc (sizeof(struct sockaddr_in));
+  memset(serv_addrs[i], '0', sizeof(serv_addrs[i]));
+
+  serv_addrs[i]->sin_family = AF_INET;
+  serv_addrs[i]->sin_port = htons(PORT);
+
+  // Convert IPv4 and IPv6 addresses from text to binary form
+  if(inet_pton(AF_INET, target_addr, &serv_addrs[i]->sin_addr)<=0)
+  {
+      printf("\nInvalid address/ Address not supported \n");
+      return -1;
+  }
+
+}
 int main(int argc, char const *argv[])
 {
     fp = fopen("response_time.log", "w");
@@ -244,19 +361,9 @@ int main(int argc, char const *argv[])
     calc_cdf();
     printf("Generated popularities.\n");
 
-    serv_addr = (struct sockaddr_in*) malloc (sizeof(struct sockaddr_in));
-    memset(serv_addr, '0', sizeof(serv_addr));
-
-    serv_addr->sin_family = AF_INET;
-    serv_addr->sin_port = htons(PORT);
-
-    // Convert IPv4 and IPv6 addresses from text to binary form
-    if(inet_pton(AF_INET, TARGET_ADDR, &serv_addr->sin_addr)<=0)
-    {
-        printf("\nInvalid address/ Address not supported \n");
-        return -1;
+    for (int i=0; i < NUM_NODES; i++){
+      setup_server_addr(i, NODES[i]);
     }
-
     printf("Writing All the keys...\n");
     struct timeval  wtvs, wtve, atvs, atve;
     gettimeofday(&wtvs, NULL);
@@ -265,7 +372,7 @@ int main(int argc, char const *argv[])
 
     printf("All keys are written.\n");
     printf("Starting running the workload...\n" );
-
+    sem_init(&rq_sem, 0, 0);
     pthread_t client_thread[NUM_THREADS];
     gettimeofday(&atvs, NULL);
     for(int i=0; i<NUM_THREADS; i++)
