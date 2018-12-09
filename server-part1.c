@@ -262,7 +262,11 @@ void *setup_sigs_and_exec_handler(void *arg) {
   sigaddset(&mask1, SIG); // block this always
   pthread_sigmask(SIG_BLOCK, &mask1, NULL);
 
-  server_handler(arg);
+  if (blocking) {
+    server_handler(arg);
+  } else {
+    server_handler_blocking(arg);
+  }
 }
 
 void server_handler(void *arg) {
@@ -276,7 +280,7 @@ void server_handler(void *arg) {
   // while (re = read(sockfd, input_line, MAX_ENTRY_SIZE)) {
   while (read(sockfd, input_line, MAX_ENTRY_SIZE) > 0) { // stop if connection closed by peer
     // db_connect();
-    if (!blocking) {
+    // if (!blocking) {
       strncpy(copy_input_line, input_line, MAX_ENTRY_SIZE);
       tokens = strtok_r(input_line, " ", &save_ptr);
       char *key = strtok_r(NULL, " ", &save_ptr);
@@ -324,7 +328,85 @@ void server_handler(void *arg) {
       input_line = (char *) calloc(MAX_ENTRY_SIZE, sizeof(char *));
       copy_input_line = (char *) calloc(MAX_ENTRY_SIZE, sizeof(char *));
       response = NULL;
-    }
+    // }
+  }
+  free(arg);
+  free(input_line);
+  free(copy_input_line);
+  input_line = NULL;
+  close(sockfd);
+  return NULL;
+}
+
+void server_handler_blocking(void *arg) {
+  int sockfd = *(int *) arg;
+  char *input_line = (char *) calloc(MAX_ENTRY_SIZE, sizeof(char));
+  char *copy_input_line = (char *) calloc(MAX_ENTRY_SIZE, sizeof(char));
+  char *tokens, *response = NULL, *save_ptr;
+  int response_size;
+  transaction txn;
+  // int re = 0;
+  // while (re = read(sockfd, input_line, MAX_ENTRY_SIZE)) {
+  while (read(sockfd, input_line, MAX_ENTRY_SIZE) > 0) { // stop if connection closed by peer
+    // db_connect();
+    // if (!blocking) {
+      strncpy(copy_input_line, input_line, MAX_ENTRY_SIZE);
+      tokens = strtok_r(input_line, " ", &save_ptr);
+      char *key = strtok_r(NULL, " ", &save_ptr);
+      char *value = strtok_r(NULL, " ", &save_ptr);
+      char *tag = strtok_r(NULL, " ", &save_ptr);
+      char *client_id = strtok_r(NULL, " ", &save_ptr);
+      abd_tag_t rec_tag = { atoi(tag), atoi(client_id) };
+      if (tokens == NULL || key == NULL || tag == NULL || client_id == NULL) {
+        printf("Invalid key/command/tag/client-id received (server-part-1)\n");
+        printf("errno: %s\n", strerror(errno)); // "errno: Connection reset by peer"
+        write(sockfd, "BAD BOI", 8);
+      } else if (strncmp(tokens, "GET", 3) == 0) { // all servers synchronized, just read from local db
+        server_1_get_request(key, &response, &response_size);
+        write(sockfd, response, (size_t) response_size);
+      } else if (strncmp(tokens, "PUT", 3) == 0) {
+        while (distributed_lock() != 0); // acquire distributed lock // TODO: what to do if failed acquiring lock? keep spinning?
+        txn.db.data = copy_input_line;
+        txn.db.data_len = strlen(copy_input_line);
+        while (log_transaction(&txn) != 0);
+        server_1_put_request_abd(key, value, &rec_tag, &response, &response_size);
+        if (broadcast_message(key, value, PUT) != 0) { printf("Error during broadcast after put:"); } // only can be done if we have lock, which we do
+        while (distributed_unlock() != 0);
+        // server_1_put_request(key, value, &response, &response_size);
+        write(sockfd, response, (size_t) response_size);
+      } else if (strncmp(tokens, "INSERT", 6) == 0) {
+        while (distributed_lock() != 0);
+        txn.db.data = copy_input_line;
+        txn.db.data_len = strlen(copy_input_line);
+        while (log_transaction(&txn) != 0);
+        server_1_insert_request_abd(key, value, &rec_tag, &response, &response_size);
+        if (broadcast_message(key, value, INSERT) != 0) { printf("Error during broadcast after insert:"); } // only can be done if we have lock, which we do
+        while (distributed_unlock() != 0);
+        // server_1_insert_request(key, value, &response, &response_size);
+        write(sockfd, "OK", 2);
+      } else if (strncmp(tokens, "DELETE", 6) == 0) {
+        while (distributed_lock() != 0);
+        txn.db.data = copy_input_line;
+        txn.db.data_len = strlen(copy_input_line);
+        while (log_transaction(&txn) != 0);
+        server_1_delete_request_abd(key, &rec_tag, &response, &response_size);
+        if (broadcast_message(key, value, DELETE) != 0) { printf("Error during broadcast after delete:"); } // only can be done if we have lock, which we do
+        while (distributed_unlock() != 0);
+        write(sockfd, response, (size_t) response_size);
+      } else {
+        write(sockfd, "ERROR", 6);
+      }
+      // db_cleanup();
+      if (response != NULL) {
+        free(response);
+      }
+      free(input_line);
+      free(copy_input_line);
+      input_line = NULL;
+      input_line = (char *) calloc(MAX_ENTRY_SIZE, sizeof(char *));
+      copy_input_line = (char *) calloc(MAX_ENTRY_SIZE, sizeof(char *));
+      response = NULL;
+    // }
   }
   free(arg);
   free(input_line);
@@ -428,10 +510,14 @@ int run_server_1(int make_blocking) {
 
   blocking = make_blocking;
   if (blocking) {
-    initialize_blocking_node();
-
+    if (initialize_blocking_node() != 0) { return EXIT_FAILURE; }
+    pthread_t *peer_handler_thread = (pthread_t *) malloc(sizeof(pthread_t));
+    if (pthread_create(peer_handler_thread, NULL, listen_peer_connections, (void *) PEER_PORT) != 0) { // *** begin listening for peer connections
+        perror("Could not begin listening for peers:");
+        return EXIT_FAILURE;
+    }
   }
-  if (loop_and_listen_1()) {
+  if (loop_and_listen_1()) { // *** begin listening for client connections
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

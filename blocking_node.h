@@ -20,8 +20,9 @@
 #include "abd.h"
 #include "data_types.h"
 
-#define MAX_CLIENTS 10
 #define QUEUED_CONNECTIONS 5
+#define MAX_PEERS 10
+
 /**
  * NOTE: In order to link against the apr library perform the following steps:
  * - Build the library as required by your system
@@ -57,7 +58,7 @@ int connect_server(char *ip, int port);
 int connect_peer(char *ip, int port);
 
 /**
- * Listen for any incoming client connections.
+ * Listen for any incoming client (server peers?) connections.
  * This also creates the necessary channel and starts listening
  * for any messages from this client.
  * NOTE: the connect_client and listen_client_connections
@@ -67,7 +68,7 @@ int connect_peer(char *ip, int port);
  * @param port Port to listen on
  * @return 0 if successful, 1 if failure
  */
-int listen_peer_connections(int port);
+void *listen_peer_connections(int port);
 
 // TODO: @Quinn Implement
 /**
@@ -82,7 +83,7 @@ void *peer_message_listen(void *); // TODO: Define functionality
  * Sends a particular message to all connected nodes in the "swarm"
  * @return
  */
-int broadcast_message(char *message, int size); // TODO: Define properly
+int broadcast_write(char *key. char *value, int write_type); // TODO: Define properly
 
 
 /************** Distributed computing functions ***************/
@@ -96,13 +97,13 @@ int distributed_lock();
 
 // TODO: @Quinn Implement
 /**
- * This function sends a lock request to the server node connected
+ * This function sends a lock request (peer message) to the server node connected
  * at sock
  * @param timestamp struct containing the current server timestamp and node id
  * @param sock
  * @return
  */
-int send_lock_request(lock_message_t *message, int sock);
+int send_peer_message(peer_message_t *message, int sock);
 
 //TODO: @Quinn: call this when a lock request is received
 /**
@@ -110,12 +111,13 @@ int send_lock_request(lock_message_t *message, int sock);
  * @param message a parsed message struct containing data from a node
  * @return 0 if success; 1 if failure
  */
-int handle_lock_request(lock_message_t *message);
+int handle_peer_message(peer_message_t *message, listener_attr_t *attribute);
 
 /**
  * Takes the needed action upon receiving a REQUEST message type.
  */
-int perform_dist_lock(lock_message_t *incoming_message);
+// void *handle_request_lock(void *arg);
+int handle_request_lock(int nid);
 
 /**
  * Sends an unlocking request to the rest of the nodes in the swarm
@@ -133,7 +135,7 @@ int distributed_unlock();
  * @param value The value associated with key
  * @return 0 if successful; 1 if failed.
  */
-int server_write_request(char *key, char *value);
+int server_write_request(char *key, char *value); // ********
 
 // TODO: Quinn Implement
 /**
@@ -142,10 +144,10 @@ int server_write_request(char *key, char *value);
  * @param value Value associated with the key
  * @return 0 if successful; 1 if failed.
  */
-int handle_server_write_request(char *key, char *value);
+int handle_server_write_request(char *key, char *value); // ********
 
 /**
- * Runs any initializing needed for a type II node.
+ * Runs any initializing needed for a type II node, and begins listening for peer connections.
  * @return 0 if successful; 1 if failed.
  */
 int initialize_blocking_node();
@@ -159,18 +161,18 @@ void update_timestamp(uint32_t new_timestamp);
  * @param buffer a pointer to a buffer of data. This function will allocate
  * the buffer as needed
  * @param message pointer to struct to marshall from
- * @return number of bytes written, 0 (-1?) if failure
+ * @return number of bytes written, -1 if failure
  */
-int marshall(char **buffer, lock_message_t *message);
+int marshall_pm(char **buffer, peer_message_t *message);
 
 // TODO: @Quinn implement
 /**
  * Unmarshalls a buffer of data into the message type
  * @param buffer buffer containing data for the message
  * @param message message struct to write data to
- * @return number of bytes written, 0 (-1?) if failure
+ * @ 0 on success, -1 if failure
  */
-int unmarshall(char *buffer, lock_message_t *message);
+int unmarshall_pm(char *buffer, peer_message_t *message);
 
 
 #endif //P3_CSRF_CLIENT_BLOCKING_H

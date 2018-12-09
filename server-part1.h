@@ -24,6 +24,7 @@
 #include "blocking_node.h"
 
 #define PORT 8086
+#define PEER_PORT 8087
 #define QUEUED_CONNECTIONS 5
 
 #define CACHE_SIZE 101
@@ -60,6 +61,11 @@ void *setup_sigs_and_exec_handler(void *arg);
  * Thread handler for the server upon accepting a new connection
  */
 void server_handler(void *arg);
+
+/**
+ * Thread handler for the PART 2 BLOCKING server upon accepting a new connection
+ */
+void server_handler_blocking(void *arg);
 
 /**
  * Handles the PUT request on the server
