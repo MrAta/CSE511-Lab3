@@ -3,7 +3,7 @@ CC=gcc
 CFLAGS=-c -g3 -ggdb -std=gnu99 -fPIC -Wall -I. -I/opt/local/include -I./libapr/include/apr-2
 LINKFLAGS=-L. -g3 -ggdb -std=gnu99 -pthread -L/opt/local/lib -L./libapr/lib
 LIBFLAGS=-shared -Wall -pthread
-LINKLIBS=-lm -lrt -lds -lapr-2
+LINKLIBS=-lm -lrt -lapr-2
 ARCHIVE=ar
 TARGETS=server client client_blocking
 OBJECTS= server-main.o \
@@ -13,7 +13,8 @@ OBJECTS= server-main.o \
 			journal.o \
 			server-part1.o \
 			client_common.o \
-			abd.o
+			abd.o \
+			pqueue.o
 LIBDS_OBJS = dslib/dict.o \
 				dslib/pqueue.o
 LIBS = libds.a
