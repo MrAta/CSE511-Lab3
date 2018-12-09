@@ -513,7 +513,8 @@ int run_server_1() {
   if (blocking) {
     if (initialize_blocking_node() != 0) { return EXIT_FAILURE; }
     pthread_t *peer_handler_thread = (pthread_t *) malloc(sizeof(pthread_t));
-    if (pthread_create(peer_handler_thread, NULL, listen_peer_connections, (void *) PEER_PORT) != 0) { // *** begin listening for peer connections
+    int p = PEER_PORT;
+    if (pthread_create(peer_handler_thread, NULL, listen_peer_connections, (void *) &p) != 0) { // *** begin listening for peer connections
         perror("Could not begin listening for peers:");
         return EXIT_FAILURE;
     }

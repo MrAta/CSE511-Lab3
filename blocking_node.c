@@ -120,8 +120,8 @@ void *listen_peer_connections(int p) {
   int sockfd, opt;
   struct sockaddr_in address;
   listener_attr_t *attribute;
-  // int port = *(int *) p;
-  int port = (int) p;
+  int port = *(int *) p;
+  // int port = (int) p;
 
   // Creating socket file descriptor
   if (( sockfd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
