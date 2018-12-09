@@ -9,11 +9,11 @@
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
-    printf("Must provide value for what sort of server to run:\n(1) abd\n(2) blocking\n");
+    printf("Usage:\n(1) abd\n(2) blocking\n(optional) specify r to enter recovery mode\n");
     return 1;
   }
 
-  if (argv[1] && ( strncmp(argv[2], "1", 1) == 0 )) {
+  if (argv[1] && ( strncmp(argv[1], "1", 1) == 0 )) {
     blocking = 0;
     if (argv[2] && ( strncmp(argv[2], "r", 1) == 0 )) {
       printf("Recovering from crash...\n");
@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
       _T = NULL; // dont reinitialize to null inside run_server_1 cause then all of our nodes from recovery are leaked
     }
     printf("Beginning [abd] server...\n");
-  } else if (argv[1] && ( strncmp(argv[2], "2", 1) == 0 )) {
+  } else if (argv[1] && ( strncmp(argv[1], "2", 1) == 0 )) {
     blocking = 1;
     if (argv[2]) {
       node_id = atoi(argv[2]);
@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
       printf("No node_id specified for blocking server.\n");
       return 1;
     }
-    if (argv[3] && ( strncmp(argv[2], "r", 1) == 0 )) {
+    if (argv[3] && ( strncmp(argv[3], "r", 1) == 0 )) {
       printf("Recovering from crash...\n");
       _T = NULL;
       if (recover() != 0) {

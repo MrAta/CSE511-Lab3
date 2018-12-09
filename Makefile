@@ -5,7 +5,7 @@ LINKFLAGS=-L. -g3 -ggdb -std=gnu99 -pthread -L/opt/local/lib -L./libapr/lib
 LIBFLAGS=-shared -Wall -pthread
 LINKLIBS=-lm -lrt -lpthread #-lapr-2
 ARCHIVE=ar
-TARGETS=server client client_blocking
+TARGETS=server client #client_blocking
 OBJECTS= server-main.o \
 			cache.o \
 			c1.o \

@@ -21,7 +21,7 @@
 #define ratio 0.1 // get/put ratio
 #define key_size 10
 #define value_size 10
-#define MAX_ENTRY_SIZE 11264
+// #define MAX_ENTRY_SIZE 11264
 #define NUM_THREADS 25
 #define NUM_OPS 10000//total number of operation for workload
 double zeta = 0.0; //zeta fixed for zipf
