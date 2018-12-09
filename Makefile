@@ -16,8 +16,9 @@ OBJECTS= server-main.o \
 			abd.o \
 			pqueue.o \
 			blocking_node.o
-LIBDS_OBJS = dslib/dict.o \
-				dslib/pqueue.o
+# LIBDS_OBJS = dslib/dict.o \
+# 				dslib/pqueue.o
+LIBDS_OBJS = pqueue.o
 LIBS = libds.a
 TEST_TARGETS=abdunit
 

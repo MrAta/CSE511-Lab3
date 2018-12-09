@@ -9,20 +9,51 @@
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
-    printf("Must provide value for what sort of server to run\n");
+    printf("Must provide value for what sort of server to run:\n(1) abd\n(2) blocking\n");
     return 1;
   }
-  if (argv[2] && ( strncmp(argv[2], "r", 1) == 0 )) {
-    printf("Recovering from crash...\n");
-    _T = NULL;
-    if (recover() != 0) {
-      printf("Error during recovery.\n");
+
+  if (argv[1] && ( strncmp(argv[2], "1", 1) == 0 )) {
+    blocking = 0;
+    if (argv[2] && ( strncmp(argv[2], "r", 1) == 0 )) {
+      printf("Recovering from crash...\n");
+      _T = NULL;
+      if (recover() != 0) {
+        printf("Error during recovery.\n");
+        // continue or stop?
+      } else {
+        printf("Recovery complete!\n");
+      }
     } else {
-      printf("Recovery complete!\n");
+      _T = NULL; // dont reinitialize to null inside run_server_1 cause then all of our nodes from recovery are leaked
     }
+    printf("Beginning [abd] server...\n");
+  } else if (argv[1] && ( strncmp(argv[2], "2", 1) == 0 )) {
+    blocking = 1;
+    if (argv[2]) {
+      node_id = atoi(argv[2]);
+      printf("node_id: %d\n", node_id);
+    } else {
+      printf("No node_id specified for blocking server.\n");
+      return 1;
+    }
+    if (argv[3] && ( strncmp(argv[2], "r", 1) == 0 )) {
+      printf("Recovering from crash...\n");
+      _T = NULL;
+      if (recover() != 0) {
+        printf("Error during recovery.\n");
+        // continue or stop?
+      } else {
+        printf("Recovery complete!\n");
+      }
+    } else {
+      _T = NULL; // dont reinitialize to null inside run_server_1 cause then all of our nodes from recovery are leaked
+    }
+    printf("Beginning [blocking] server...\n");
   } else {
-    _T = NULL; // dont reinitialize to null inside run_server_1 cause then all of our nodes from recovery are leaked
+    printf("Invalid arguments.\n");
   }
-  printf("\nWaiting for new connections...\n");
-  return run_server_1(atoi(argv[1]));
+
+  printf("Waiting for new connections...\n");
+  return run_server_1();
 }

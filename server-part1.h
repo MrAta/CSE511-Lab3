@@ -39,6 +39,10 @@ typedef enum {
 extern c0_node * _T;
 extern struct sockaddr_in address;
 
+/* For part 2, making these available for server-main.c */
+extern int blocking; // declared in server-part1.c
+extern uint32_t node_id; // declared in blocking_node.c
+
 int create_server_1();
 
 static void my_timer_handler(int sig, siginfo_t *si, void *uc);
@@ -55,7 +59,7 @@ int loop_and_listen_1();
  * @param blocking 1 if run the servers with ABD protocol
  * @return 0 if success 1 if failure
  */
-int run_server_1(int make_blocking);
+int run_server_1();
 
 /**
  * Setup signal mask for helper threads (blocking handler) then call server helper

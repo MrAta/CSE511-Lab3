@@ -5,6 +5,7 @@
 #ifndef P3_CSRF_DATA_TYPES_H
 #define P3_CSRF_DATA_TYPES_H
 
+#include <stdint.h>
 // #include "apr/include/apr_queue.h"
 #include "common.h"
 
@@ -34,6 +35,6 @@ typedef struct {
   int write_type;
 } peer_message_t;
 
-// typedef peer_message_t * pqueue_data_t;
+typedef peer_message_t * pqueue_data_t;
 
 #endif //P3_CSRF_DATA_TYPES_H

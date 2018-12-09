@@ -370,7 +370,7 @@ void server_handler_blocking(void *arg) {
         txn.db.data_len = strlen(copy_input_line);
         while (log_transaction(&txn) != 0);
         server_1_put_request_abd(key, value, &rec_tag, &response, &response_size);
-        if (broadcast_message(key, value, PUT) != 0) { printf("Error during broadcast after put:"); } // only can be done if we have lock, which we do
+        if (broadcast_write(key, value, PUT) != 0) { printf("Error during broadcast after put:"); } // only can be done if we have lock, which we do
         while (distributed_unlock() != 0);
         // server_1_put_request(key, value, &response, &response_size);
         write(sockfd, response, (size_t) response_size);
@@ -380,7 +380,7 @@ void server_handler_blocking(void *arg) {
         txn.db.data_len = strlen(copy_input_line);
         while (log_transaction(&txn) != 0);
         server_1_insert_request_abd(key, value, &rec_tag, &response, &response_size);
-        if (broadcast_message(key, value, INSERT) != 0) { printf("Error during broadcast after insert:"); } // only can be done if we have lock, which we do
+        if (broadcast_write(key, value, INSERT) != 0) { printf("Error during broadcast after insert:"); } // only can be done if we have lock, which we do
         while (distributed_unlock() != 0);
         // server_1_insert_request(key, value, &response, &response_size);
         write(sockfd, "OK", 2);
@@ -390,7 +390,7 @@ void server_handler_blocking(void *arg) {
         txn.db.data_len = strlen(copy_input_line);
         while (log_transaction(&txn) != 0);
         server_1_delete_request_abd(key, &rec_tag, &response, &response_size);
-        if (broadcast_message(key, value, DELETE) != 0) { printf("Error during broadcast after delete:"); } // only can be done if we have lock, which we do
+        if (broadcast_write(key, value, DELETE) != 0) { printf("Error during broadcast after delete:"); } // only can be done if we have lock, which we do
         while (distributed_unlock() != 0);
         write(sockfd, response, (size_t) response_size);
       } else {
@@ -470,7 +470,7 @@ int loop_and_listen_1() {
   }
 }
 
-int run_server_1(int make_blocking) {
+int run_server_1() {
   // Load database
   head = tail = temp_node = NULL;
   // _T = NULL;
@@ -508,7 +508,8 @@ int run_server_1(int make_blocking) {
 
   c1_init();
 
-  blocking = make_blocking;
+  // blocking = make_blocking; // set in server-main.c
+
   if (blocking) {
     if (initialize_blocking_node() != 0) { return EXIT_FAILURE; }
     pthread_t *peer_handler_thread = (pthread_t *) malloc(sizeof(pthread_t));
