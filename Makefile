@@ -14,7 +14,8 @@ OBJECTS= server-main.o \
 			server-part1.o \
 			client_common.o \
 			abd.o \
-			pqueue.o
+			pqueue.o \
+			blocking_node.o
 LIBDS_OBJS = dslib/dict.o \
 				dslib/pqueue.o
 LIBS = libds.a
