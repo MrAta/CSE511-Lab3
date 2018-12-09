@@ -267,8 +267,8 @@ int distributed_lock() { // used by client-server handler thread right (?)
   msg->timestamp = timestamp;
   msg->node_id = node_id;
   msg->message_type = REQUEST_LOCK;
-  msg->key = (char *) calloc(1);
-  msg->value = (char *) calloc(1);
+  msg->key = (char *) calloc(1, sizeof(char));
+  msg->value = (char *) calloc(1, sizeof(char));
   msg->write_type = -1;
 
   // ADD REQUEST TO Q_{node_id}
@@ -368,8 +368,8 @@ int distributed_unlock() {
   msg->timestamp = timestamp;
   msg->node_id = node_id;
   msg->message_type = RELEASE_LOCK;
-  msg->key = (char *) calloc(1);
-  msg->value = (char *) calloc(1);
+  msg->key = (char *) calloc(1, sizeof(char));
+  msg->value = (char *) calloc(1, sizeof(char));
   msg->write_type = -1;
 
   // BROADCAST REQUEST TO ALL PROCESSES

@@ -15,7 +15,9 @@
 #include <pthread.h>
 #include <math.h>
 #include <semaphore.h>
+#include <fcntl.h>
 // #include "apr-2/include/apr_queue.h"
+#include "journal.h"
 #include "pqueue.h"
 #include "abd.h"
 #include "data_types.h"

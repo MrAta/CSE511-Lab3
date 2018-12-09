@@ -15,7 +15,8 @@
 typedef int pqueue_data_t;
 
 typedef struct pqueue {
-  pqueue_data_t data[MAX];
+  // pqueue_data_t data[MAX];
+  peer_message_t *data[MAX];
   int rear, front;
 } pqueue;
 
