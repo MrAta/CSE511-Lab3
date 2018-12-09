@@ -5,14 +5,14 @@
 #ifndef P3_CSRF_DATA_TYPES_H
 #define P3_CSRF_DATA_TYPES_H
 
-#include "apr/include/apr_queue.h"
+// #include "apr/include/apr_queue.h"
 #include "common.h"
 
 #define MAX_MESSAGE_SIZE (1 + 4 + 4 + MAX_ENTRY_SIZE) // message_type, timestamp, node_id, key, [value] (value needed in this case of SERVER_WRITE)
 
 typedef struct {
   int socket;
-  apr_queue_t *channel;
+  // apr_queue_t *channel;
 } listener_attr_t;
 
 typedef enum {
@@ -34,6 +34,6 @@ typedef struct {
   int write_type;
 } peer_message_t;
 
-typedef peer_message_t * pqueue_data_t;
+// typedef peer_message_t * pqueue_data_t;
 
 #endif //P3_CSRF_DATA_TYPES_H

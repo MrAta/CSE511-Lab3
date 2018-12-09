@@ -27,6 +27,13 @@
 #define PEER_PORT 8087
 #define QUEUED_CONNECTIONS 5
 
+typedef enum {
+    GET,
+    PUT,
+    INSERT,
+    DELETE
+} write_type_t;
+
 #define CACHE_SIZE 101
 
 extern c0_node * _T;

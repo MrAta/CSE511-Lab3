@@ -3,7 +3,7 @@ CC=gcc
 CFLAGS=-c -g3 -ggdb -std=gnu99 -fPIC -Wall -I. -I/opt/local/include -I./libapr/include/apr-2
 LINKFLAGS=-L. -g3 -ggdb -std=gnu99 -pthread -L/opt/local/lib -L./libapr/lib
 LIBFLAGS=-shared -Wall -pthread
-LINKLIBS=-lm -lrt -lapr-2
+LINKLIBS=-lm -lrt #-lapr-2
 ARCHIVE=ar
 TARGETS=server client client_blocking
 OBJECTS= server-main.o \

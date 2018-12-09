@@ -15,8 +15,8 @@
 #include <pthread.h>
 #include <math.h>
 #include <semaphore.h>
-#include "apr/include/apr_queue.h"
-#include "dslib/pqueue.h"
+// #include "apr-2/include/apr_queue.h"
+#include "pqueue.h"
 #include "abd.h"
 #include "data_types.h"
 
@@ -30,14 +30,14 @@
  *      as libapr
  * - Set the environment variable LD_LIBRARY_PATH to the libapr/lib path
  */
-extern apr_queue_t *channel;
-extern apr_pool_t *allocator;
+// extern apr_queue_t *channel;
+// extern apr_pool_t *allocator;
 extern pqueue *lock_queue;
 extern uint32_t timestamp;
 // TODO: @Quinn Add this to the command line args
 extern uint32_t node_id;
 
-extern int connected_socks[MAX_CLIENTS];
+extern int connected_socks[MAX_PEERS];
 extern int connected_clients;
 
 /**
@@ -83,7 +83,7 @@ void *peer_message_listen(void *); // TODO: Define functionality
  * Sends a particular message to all connected nodes in the "swarm"
  * @return
  */
-int broadcast_write(char *key. char *value, int write_type); // TODO: Define properly
+int broadcast_write(char *key, char *value, int write_type); // TODO: Define properly
 
 
 /************** Distributed computing functions ***************/

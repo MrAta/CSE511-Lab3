@@ -6,8 +6,8 @@
 #include "blocking_node.h"
 
 // GLOBAL VARIABLES
-apr_queue_t *channel;
-apr_pool_t *allocator;
+// apr_queue_t *channel;
+// apr_pool_t *allocator;
 int connected_peers;
 int connected_socks[MAX_PEERS];
 // int waiting_index[MAX_PEERS];
@@ -26,10 +26,10 @@ int rq_locks_pending[MAX_PEERS] = {0};
 
 int initialize_blocking_node() {
   // Configure Apache Portable Runtime Library
-  apr_initialize();
-  apr_pool_create(&allocator, NULL);
+  // apr_initialize();
+  // apr_pool_create(&allocator, NULL);
   // Create Channel for inter-thread communication
-  apr_queue_create(&channel, 50, allocator);
+  // apr_queue_create(&channel, 50, allocator);
   // Create and initialize lock priority queue
   lock_queue = malloc(sizeof(pqueue));
   initialize(lock_queue);
@@ -91,7 +91,7 @@ int connect_peer(char *ip, int port) {
   }
   attribute = malloc(sizeof(listener_attr_t));
   attribute->socket = sock;
-  attribute->channel = channel;
+  // attribute->channel = channel;
   pthread_create(&listener_thread, NULL, peer_message_listen, (void *) attribute);
   connected_socks[connected_peers] = sock;
   // INITIALIZE GLOBAL SEMAPHORES
@@ -154,7 +154,7 @@ void *listen_peer_connections(int p) {
     }
     attribute = malloc(sizeof(attribute));
     attribute->socket = newsockfd;
-    attribute->channel = channel;
+    // attribute->channel = channel;
     pthread_t *handler_thread = (pthread_t *) malloc(sizeof(pthread_t));
     if (pthread_create(handler_thread, NULL, peer_message_listen, (void *) attribute) != 0) { // hand off to another thread to monitor this socket
       perror("Could not start handler");
@@ -429,7 +429,7 @@ int handle_peer_message(peer_message_t *message, listener_attr_t *attribute) {
       // return 0; // TODO?
       // check that incoming_message->node_id == peek(lock_queue)->node_id
       if (message->node_id == peek(lock_queue)->node_id) { // only act if the SERVER_WRITE is coming from the server that holds the lock
-        
+        // TODO tomorrow
       }
     default:
       printf("You've  made a grave mistake. I cannot handle this\n");
@@ -521,7 +521,7 @@ int send_peer_message(peer_message_t *message, int sock) {
   free(buf);
 }
 
-int broadcast_write(char *key. char *value, int write_type) {
+int broadcast_write(char *key, char *value, int write_type) {
   peer_message_t *msg = malloc(sizeof(peer_message_t));
   msg->node_id = node_id;
   msg->message_type = message_type;
