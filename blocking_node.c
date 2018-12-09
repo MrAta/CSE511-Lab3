@@ -102,7 +102,7 @@ int connect_peer(char *ip, int port) {
 //    return -1;
 //  }
   sem[connected_peers] = malloc(sizeof(sem_t));
-  if (sem_init(sem[connected_peers], 0, 1)) {
+  if (sem_init(sem[connected_peers], 0, 0)) {
     perror("Could not open semaphore\n");
     return -1;
   }
@@ -170,7 +170,7 @@ void *listen_peer_connections(int p) {
     connected_socks[connected_peers] = newsockfd;
     // INITIALIZE GLOBAL SEMAPHORES
     sem[connected_peers] = malloc(sizeof(sem_t));
-    if (sem_init(sem[connected_peers], 0, 1)) {
+    if (sem_init(sem[connected_peers], 0, 0)) {
       perror("Could not open semaphore\n");
       return -1;
     }
