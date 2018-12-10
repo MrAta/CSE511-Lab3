@@ -266,6 +266,7 @@ char *c1_get(char *key) {
   free(fname);
   if (file == NULL) {
     fprintf(stderr, "Failed to open current counter file\n");
+    printf("errno: %s\n", strerror(errno));
     return NULL;
   }
   fseek(file, 0, SEEK_END);

@@ -179,7 +179,7 @@ void *listen_peer_connections(void *p) {
 
     socklen_t cli_addr_size = sizeof(address);
     int newsockfd = accept(sockfd, (struct sockaddr *) &address, &cli_addr_size);
-    printf("Got new connection\n");
+    printf("Got new peer connection\n");
 
     // int idx = next_peer_index();
     peer_index = next_peer_index();
@@ -335,8 +335,10 @@ int distributed_lock() { // used by client-server handler thread right (?)
   msg->timestamp = timestamp;
   msg->node_id = node_id;
   msg->message_type = REQUEST_LOCK;
-  msg->key = (char *) calloc(1, sizeof(char));
-  msg->value = (char *) calloc(1, sizeof(char));
+  msg->key = (char *) calloc(2, sizeof(char));
+  msg->value = (char *) calloc(2, sizeof(char));
+  memcpy(msg->key, "1", 1);
+  memcpy(msg->value, "1", 1);
   // msg->write_type = -1;
   msg->write_type = 0;
 
@@ -361,7 +363,7 @@ int distributed_lock() { // used by client-server handler thread right (?)
       continue;
     }
     if (send_peer_message(msg, peers[i].sock) != 0) { // might be issue here if node_id doesnt match the peer_index counter value
-      printf("Could not send lock request to node: %d\n", peers[i].peer_node_id);
+      printf("Could not send REQUEST_LOCK to node: %d\n", peers[i].peer_node_id);
       pthread_mutex_unlock(mutex);
       return -1;
     }
@@ -442,8 +444,10 @@ int distributed_unlock() {
   msg->timestamp = timestamp;
   msg->node_id = node_id;
   msg->message_type = RELEASE_LOCK;
-  msg->key = (char *) calloc(1, sizeof(char));
-  msg->value = (char *) calloc(1, sizeof(char));
+  msg->key = (char *) calloc(2, sizeof(char));
+  msg->value = (char *) calloc(2, sizeof(char));
+  memcpy(msg->key, "1", 1);
+  memcpy(msg->value, "1", 1);
   // msg->write_type = -1;
   msg->write_type = 0;
 
@@ -458,7 +462,7 @@ int distributed_unlock() {
       continue;
     }
     if (send_peer_message(msg, peers[i].sock) != 0) { // might be issue here if node_id doesnt match the peer_index counter value
-      printf("Could not send lock request to node: %d\n", i);
+      printf("Could not send RELEASE_LOCK to node: %d\n", i);
       return -1; // spin until we are able to send all RELEASE_LOCKs
     }
   }
@@ -487,6 +491,8 @@ int handle_peer_message(peer_message_t *message, peer_t *peer) {
 
       // if (sem_trywait(sem[message->node_id]) != 0) { // lock is available if we are not waiting on a REPLY_LOCK; otherwise we are, so set flag to be handled up top
       if (sem_trywait(peer->sem) != 0) {
+        printf("Peer requested lock, but still waiting on response\n");
+        printf("errno: %s\n", strerror(errno));
         pthread_mutex_lock(&lp_mutex);
         // enqueue(lock_queue, message);
         // rq_locks_pending[message->node_id] = 1;
@@ -562,8 +568,10 @@ int handle_request_lock(peer_t *peer) {
   outgoing_message->node_id = node_id;
   outgoing_message->message_type = REPLY_LOCK;
   outgoing_message->timestamp = timestamp;
-  outgoing_message->key = (char *) calloc(1, sizeof(char));
-  outgoing_message->value = (char *) calloc(1, sizeof(char));
+  outgoing_message->key = (char *) calloc(2, sizeof(char));
+  outgoing_message->value = (char *) calloc(2, sizeof(char));
+  memcpy(outgoing_message->key, "1", 1);
+  memcpy(outgoing_message->value, "1", 1);
   outgoing_message->write_type = 0;
 
   send_peer_message(outgoing_message, peer->sock);
@@ -581,38 +589,60 @@ void update_timestamp(uint32_t new_timestamp) {
 }
 
 int marshall_pm(char **buffer, peer_message_t *message) {
-  memcpy(( *buffer ), &message->message_type, sizeof(int));
-  memcpy(( *buffer ) + sizeof(int), " ", 1);
-  memcpy(( *buffer ) + sizeof(int) + 1, &message->timestamp, sizeof(int));
-  memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int), " ", 1);
-  memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1, &message->node_id, sizeof(int));
-  memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int), " ", 1);
-  memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1, message->key, strlen(message->key));
-  memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + strlen(message->key), " ", 1);
-  memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + strlen(message->key) + 1, message->value, strlen(message->value));
-  memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + strlen(message->key) + 1 + strlen(message->value), " ", 1);
-  memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + strlen(message->key) + 1 + strlen(message->value) + 1, &message->write_type, sizeof(int));
-  memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + strlen(message->key) + 1 + strlen(message->value) + 1 + sizeof(int), '\0', 1);
+  memcpy(( *buffer ), &(message->message_type), sizeof(int));
+  // memcpy(( *buffer ) + sizeof(int), " ", 1);
+  memcpy(( *buffer ) + sizeof(int), &(message->timestamp), sizeof(int));
+  // memcpy(( *buffer ) + sizeof(int) + 1, &(message->timestamp), sizeof(int));
+  // memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int), " ", 1);
+  memcpy(( *buffer ) + sizeof(int) + sizeof(int), &(message->node_id), sizeof(int));
+  // memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1, &(message->node_id), sizeof(int));
+  // memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int), " ", 1);
+  memcpy(( *buffer ) + sizeof(int) + sizeof(int) + sizeof(int), &(message->write_type), sizeof(int));
+  // memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1, &(message->write_type), sizeof(int));
+  // memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int), " ", 1);
+  memcpy(( *buffer ) + sizeof(int) + sizeof(int) + sizeof(int) + sizeof(int), message->key, strlen(message->key));
+  // memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1, message->key, strlen(message->key));
+  // memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + strlen(message->key), " ", 1);
+  memcpy(( *buffer ) + sizeof(int) + sizeof(int) + sizeof(int) + sizeof(int) + strlen(message->key), " ", 1); // keep space so we can tokenize (k,v) instead of having length field
+  memcpy(( *buffer ) + sizeof(int) + sizeof(int) + sizeof(int) + sizeof(int) + strlen(message->key) + 1, message->value, strlen(message->value));
+  // memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + strlen(message->key) + 1, message->value, strlen(message->value));
+  // memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + strlen(message->key) + 1 + strlen(message->value) + 1, &(message->write_type), sizeof(int));
+  // memcpy(( *buffer ) + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + strlen(message->key) + 1 + strlen(message->value), "\0", 1);
+  memcpy(( *buffer ) + sizeof(int) + sizeof(int) + sizeof(int) + sizeof(int) + strlen(message->key) + 1 + strlen(message->value), "\0", 1);
   // assert(size <= MAX_MESSAGE_SIZE); // ??
-  return ( sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + strlen(message->key) + 1 + strlen(message->value) + 1 + sizeof(int) + 1 );
+  // return ( sizeof(int) + 1 + sizeof(int) + 1 + sizeof(int) + 1 + strlen(message->key) + 1 + strlen(message->value) + 1 + sizeof(int) + 1 );
+  return ( sizeof(int) + sizeof(int) + sizeof(int) + sizeof(int) + strlen(message->key) + 1 + strlen(message->value) + 1 );
 }
 
 int unmarshall_pm(char *peer_msg_buf, peer_message_t *peer_msg) {
   char *save_ptr = NULL;
-  peer_msg->message_type = atoi(strtok_r(peer_msg_buf, " ", &save_ptr));
-  peer_msg->timestamp = atoi(strtok_r(NULL, " ",
-                                      &save_ptr)); // TODO: proper checking on these ints since timestamp can be 0 but atoi returns 0 on error
-  peer_msg->node_id = atoi(strtok_r(NULL, " ", &save_ptr));
 
-  char *k = strtok_r(NULL, " ", &save_ptr);
+  memcpy(&(peer_msg->message_type), peer_msg_buf, sizeof(int));
+  memcpy(&(peer_msg->timestamp), peer_msg_buf+sizeof(int), sizeof(int));
+  memcpy(&(peer_msg->node_id), peer_msg_buf+2*sizeof(int), sizeof(int));
+  memcpy(&(peer_msg->write_type), peer_msg_buf+3*sizeof(int), sizeof(int));
+
+  char *k = strtok_r(peer_msg_buf+4*sizeof(int), " ", &save_ptr);
   peer_msg->key = (char *) calloc(strlen(k), sizeof(char));
   memcpy(peer_msg->key, k, strlen(k));
 
-  char *v = strtok_r(NULL, " ", &save_ptr);
-  peer_msg->value = (char *) calloc(strlen(k), sizeof(char));
-  memcpy(peer_msg->value, k, strlen(k));
+  char *v = strtok_r(NULL, " ", &save_ptr); // should break on  \0
+  peer_msg->value = (char *) calloc(strlen(v), sizeof(char));
+  memcpy(peer_msg->value, v, strlen(v));
 
-  peer_msg->write_type = atoi(strtok_r(NULL, " ", &save_ptr)); // will break on \0 term, no space at end
+  // // peer_msg->message_type = atoi(strtok_r(peer_msg_buf, " ", &save_ptr));
+  // peer_msg->timestamp = atoi(strtok_r(NULL, " ", &save_ptr)); // TODO: proper checking on these ints since timestamp can be 0 but atoi returns 0 on error
+  // peer_msg->node_id = atoi(strtok_r(NULL, " ", &save_ptr));
+
+  // char *k = strtok_r(NULL, " ", &save_ptr);
+  // peer_msg->key = (char *) calloc(strlen(k), sizeof(char));
+  // memcpy(peer_msg->key, k, strlen(k));
+
+  // char *v = strtok_r(NULL, " ", &save_ptr);
+  // peer_msg->value = (char *) calloc(strlen(v), sizeof(char));
+  // memcpy(peer_msg->value, v, strlen(v));
+
+  // peer_msg->write_type = atoi(strtok_r(NULL, " ", &save_ptr)); // will break on \0 term, no space at end
 
   return 0;
 }
@@ -622,6 +652,7 @@ int send_peer_message(peer_message_t *message, int sock) {
   int numbytes = marshall_pm(&buf, message);
   write(sock, buf, numbytes);
   free(buf);
+  return 0;
 }
 
 int broadcast_write(char *key, char *value, int write_type) {

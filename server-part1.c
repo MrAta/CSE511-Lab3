@@ -263,9 +263,9 @@ void *setup_sigs_and_exec_handler(void *arg) {
   pthread_sigmask(SIG_BLOCK, &mask1, NULL);
 
   if (blocking) {
-    server_handler(arg);
-  } else {
     server_handler_blocking(arg);
+  } else {
+    server_handler(arg);
   }
 }
 
@@ -278,7 +278,7 @@ void server_handler(void *arg) {
   transaction txn;
   // int re = 0;
   // while (re = read(sockfd, input_line, MAX_ENTRY_SIZE)) {
-  while (read(sockfd, input_line, MAX_ENTRY_SIZE) > 0) { // stop if connection closed by peer
+  while (read(sockfd, input_line, MAX_ENTRY_SIZE) > 0) { // stop if connection closed by client
     // db_connect();
     // if (!blocking) {
       strncpy(copy_input_line, input_line, MAX_ENTRY_SIZE);
@@ -289,8 +289,9 @@ void server_handler(void *arg) {
       char *client_id = strtok_r(NULL, " ", &save_ptr);
       abd_tag_t rec_tag = { atoi(tag), atoi(client_id) };
       if (tokens == NULL || key == NULL || tag == NULL || client_id == NULL) {
+      // if (tokens == NULL || key == NULL) {
         printf("Invalid key/command/tag/client-id received (server-part-1)\n");
-        printf("errno: %s\n", strerror(errno)); // "errno: Connection reset by peer"
+        // printf("errno: %s\n", strerror(errno)); // "errno: Connection reset by peer"
         write(sockfd, "BAD BOI", 8);
       } else if (strncmp(tokens, "GET", 3) == 0) {
         server_1_get_request(key, &response, &response_size);
@@ -299,20 +300,21 @@ void server_handler(void *arg) {
         txn.db.data = copy_input_line;
         txn.db.data_len = strlen(copy_input_line);
         while (log_transaction(&txn) != 0);
+        // server_1_put_request(key, value, &response, &response_size);
         server_1_put_request_abd(key, value, &rec_tag, &response, &response_size);
-//        server_1_put_request(key, value, &response, &response_size);
         write(sockfd, response, (size_t) response_size);
       } else if (strncmp(tokens, "INSERT", 6) == 0) {
         txn.db.data = copy_input_line;
         txn.db.data_len = strlen(copy_input_line);
         while (log_transaction(&txn) != 0);
+        // server_1_insert_request(key, value, &response, &response_size);
         server_1_insert_request_abd(key, value, &rec_tag, &response, &response_size);
-//        server_1_insert_request(key, value, &response, &response_size);
         write(sockfd, "OK", 2);
       } else if (strncmp(tokens, "DELETE", 6) == 0) {
         txn.db.data = copy_input_line;
         txn.db.data_len = strlen(copy_input_line);
         while (log_transaction(&txn) != 0);
+        // server_1_delete_request(key, &response, &response_size);
         server_1_delete_request_abd(key, &rec_tag, &response, &response_size);
         write(sockfd, response, (size_t) response_size);
       } else {
@@ -354,10 +356,11 @@ void server_handler_blocking(void *arg) {
       tokens = strtok_r(input_line, " ", &save_ptr);
       char *key = strtok_r(NULL, " ", &save_ptr);
       char *value = strtok_r(NULL, " ", &save_ptr);
-      char *tag = strtok_r(NULL, " ", &save_ptr);
-      char *client_id = strtok_r(NULL, " ", &save_ptr);
-      abd_tag_t rec_tag = { atoi(tag), atoi(client_id) };
-      if (tokens == NULL || key == NULL || tag == NULL || client_id == NULL) {
+      // char *tag = strtok_r(NULL, " ", &save_ptr);
+      // char *client_id = strtok_r(NULL, " ", &save_ptr);
+      // abd_tag_t rec_tag = { atoi(tag), atoi(client_id) };
+      // if (tokens == NULL || key == NULL || tag == NULL || client_id == NULL) {
+      if (tokens == NULL || key == NULL) {
         printf("Invalid key/command/tag/client-id received (server-part-1)\n");
         printf("errno: %s\n", strerror(errno)); // "errno: Connection reset by peer"
         write(sockfd, "BAD BOI", 8);
@@ -366,32 +369,41 @@ void server_handler_blocking(void *arg) {
         write(sockfd, response, (size_t) response_size);
       } else if (strncmp(tokens, "PUT", 3) == 0) {
         while (distributed_lock() != 0); // acquire distributed lock // TODO: what to do if failed acquiring lock? keep spinning?
+        printf("[acquired dist_lock]\n");
         txn.db.data = copy_input_line;
         txn.db.data_len = strlen(copy_input_line);
         while (log_transaction(&txn) != 0);
-        server_1_put_request_abd(key, value, &rec_tag, &response, &response_size);
+        server_1_put_request(key, value, &response, &response_size);
+        // server_1_put_request_abd(key, value, &rec_tag, &response, &response_size);
         while (broadcast_write(key, value, PUT) != 0); // only can be done if we have lock, which we do
         while (distributed_unlock() != 0);
+        printf("[released dist_lock]\n");
         // server_1_put_request(key, value, &response, &response_size);
         write(sockfd, response, (size_t) response_size);
       } else if (strncmp(tokens, "INSERT", 6) == 0) {
         while (distributed_lock() != 0);
+        printf("[acquired dist_lock]\n");
         txn.db.data = copy_input_line;
         txn.db.data_len = strlen(copy_input_line);
         while (log_transaction(&txn) != 0);
-        server_1_insert_request_abd(key, value, &rec_tag, &response, &response_size);
+        server_1_insert_request(key, value, &response, &response_size);
+        // server_1_insert_request_abd(key, value, &rec_tag, &response, &response_size);
         while (broadcast_write(key, value, INSERT) != 0); // only can be done if we have lock, which we do
         while (distributed_unlock() != 0);
+        printf("[released dist_lock]\n");
         // server_1_insert_request(key, value, &response, &response_size);
         write(sockfd, "OK", 2);
       } else if (strncmp(tokens, "DELETE", 6) == 0) {
         while (distributed_lock() != 0);
+        printf("[acquired dist_lock]\n");
         txn.db.data = copy_input_line;
         txn.db.data_len = strlen(copy_input_line);
         while (log_transaction(&txn) != 0);
-        server_1_delete_request_abd(key, &rec_tag, &response, &response_size);
+        server_1_delete_request(key, &response, &response_size);
+        // server_1_delete_request_abd(key, &rec_tag, &response, &response_size);
         while (broadcast_write(key, value, DELETE) != 0); // only can be done if we have lock, which we do
         while (distributed_unlock() != 0);
+        printf("[released dist_lock]\n");
         write(sockfd, response, (size_t) response_size);
       } else {
         write(sockfd, "ERROR", 6);
@@ -455,7 +467,7 @@ int loop_and_listen_1() {
   while (1) {
     socklen_t cli_addr_size = sizeof(address);
     int newsockfd = accept(sock_fd, (struct sockaddr *) &address, &cli_addr_size);
-    printf("Got new connection\n");
+    printf("Got new client connection\n");
     if (newsockfd < 0) {
       perror("Could not accept connection");
       continue;
