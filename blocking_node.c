@@ -359,7 +359,9 @@ int distributed_lock() { // used by client-server handler thread right (?)
     if (!peers[i].valid) {
       continue;
     }
-    if (sem_wait(peers[i].sem) != 0) { // wait until we are able to acquire lock for all peers (i.e. we have received REPLY_LOCK from all of them and sem_post'ed them)
+    // instead of waiting for all REPLY_LOCKs, should we get rid of this and just have a loop spin on a global counter for # of REPLYs gotten?
+    // then after that loop breaks, we spin on the queue until we are allowed to have lock?
+    if (sem_wait(peers[i].sem) != 0) { // wait until we are able to acquire lock for all peers (i.e. we have received REPLY_LOCK from all of them and sem_post'ed them);WILL get stuck/block forever if peer doesnt respond; how can set timeout?
       perror("Could not block on semaphore\n");
       pthread_mutex_unlock(mutex);
       return -1;
@@ -502,15 +504,23 @@ int handle_peer_message(peer_message_t *message, peer_t *peer) {
     case SERVER_WRITE:
       // return 0; // TODO?
       // check that incoming_message->node_id == peek(lock_queue)->node_id
-      if (message->node_id == peek(lock_queue)->node_id) { // only act if the SERVER_WRITE is coming from the server that holds the lock
-        // TODO tomorrow
+      if (message->node_id == peek(lock_queue)->node_id) { // only act if the SERVER_WRITE is coming from the server that holds the lock; otherwise ignore
+        return server_write_request(message);
       }
+      return 0;
     default:
       printf("You've  made a grave mistake. I cannot handle this\n");
-      assert(0);
-      return -1;
-      //write(attribute->socket, "ERROR", 6);
+      // assert(0); return -1; // abort or just ignore the message?
+      return 0;
   }
+}
+
+int server_write_request(peer_message_t *message) {
+  char *response = NULL;
+  int response_size = 0;
+  int rc = server_1_put_request(message->key, message->value, &response, &response_size);
+  if (response != NULL) { free(response); } // dont need to send anything back, just free this
+  return rc;
 }
 
 // void *handle_request_lock(void *arg) {

@@ -20,6 +20,7 @@
 #include "pqueue.h"
 #include "abd.h"
 #include "data_types.h"
+#include "server-part1.h"
 
 #define QUEUED_CONNECTIONS 5
 #define MAX_PEERS 10
@@ -139,16 +140,17 @@ int distributed_unlock();
  * @param value The value associated with key
  * @return 0 if successful; 1 if failed.
  */
-int server_write_request(char *key, char *value); // ********
+// int server_write_request(char *key, char *value); // ********
+int server_write_request(peer_message_t *message); // ********
 
-// TODO: Quinn Implement
-/**
- * Handle an incoming write request from a server that holds the lock
- * @param key Key to write value for
- * @param value Value associated with the key
- * @return 0 if successful; 1 if failed.
- */
-int handle_server_write_request(char *key, char *value); // ********
+// // TODO: Quinn Implement
+// /**
+//  * Handle an incoming write request from a server that holds the lock
+//  * @param key Key to write value for
+//  * @param value Value associated with the key
+//  * @return 0 if successful; 1 if failed.
+//  */
+// int handle_server_write_request(char *key, char *value); // ********
 
 /**
  * Runs any initializing needed for a type II node, and begins listening for peer connections.
