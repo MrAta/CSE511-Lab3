@@ -9,6 +9,7 @@
 
 int main(int argc, char *argv[]) {
   int rem_args = 0;
+  int r = 0;
   if (argc < 2) {
     printf("Usage:\n(1) abd\n(2) blocking\n(optional) specify r to enter recovery mode\n");
     return 1;
@@ -17,6 +18,7 @@ int main(int argc, char *argv[]) {
   if (argv[1] && ( strncmp(argv[1], "1", 1) == 0 )) {
     blocking = 0;
     if (argv[2] && ( strncmp(argv[2], "r", 1) == 0 )) {
+      r = 1;
       printf("Recovering from crash...\n");
       _T = NULL;
       if (recover() != 0) {
@@ -39,6 +41,7 @@ int main(int argc, char *argv[]) {
       return 1;
     }
     if (argv[3] && ( strncmp(argv[3], "r", 1) == 0 )) {
+      r = 1;
       rem_args = argc - 4;
       printf("Recovering from crash...\n");
       _T = NULL;
@@ -59,5 +62,5 @@ int main(int argc, char *argv[]) {
   }
 
   printf("Waiting for new connections...\n");
-  return run_server_1(rem_args, argv[3] ? &argv[3] : &argv[2]);
+  return run_server_1(rem_args, argv[3+r] ? &argv[3+r] : &argv[2+r]);
 }

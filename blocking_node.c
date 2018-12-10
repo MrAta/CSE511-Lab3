@@ -82,7 +82,7 @@ int connect_peer(char *ip, int port) {
   peer_index = next_peer_index();
   // if (idx == -1) {
   if (peer_index == -1) {
-    printf("Cannot connect to anymore peers. Disconnect from 1 or more to connect to another.");
+    printf("Cannot connect to anymore peers. Disconnect from 1 or more to connect to another.\n");
     return -1;
   }
   // peer_index = idx;
@@ -102,11 +102,12 @@ int connect_peer(char *ip, int port) {
   write(sock, (void *)&node_id, 4); // send the peer our node_id
   char *peer_id = (char *)calloc(4, sizeof(char));
   if (read(sock, peer_id, 4) != 4) {
-    printf("Could not connect to peer [%s]: ", ip);
+    printf("Could not connect to peer [%s]\n", ip);
     return -1;
   };
   peers[peer_index].valid = 1;
-  peers[peer_index].peer_node_id = atoi(peer_id);
+  // peers[peer_index].peer_node_id = atoi(peer_id);
+  peers[peer_index].peer_node_id = *(int*)peer_id;
   peers[peer_index].sock = sock;
   peers[peer_index].request_lock_pending = 0;
   peers[peer_index].sem = (sem_t *) calloc(sizeof(sem_t), sizeof(char));
@@ -127,6 +128,8 @@ int connect_peer(char *ip, int port) {
   //   return -1;
   // }
   // peer_index++; // dont need this with next_peer_index()
+  printf("Successfully connected to peer: [%d][%s:%d]\n", *(int*)peer_id, ip, port);
+  if (peer_id) { free(peer_id); }
   return 0;
 }
 
@@ -140,6 +143,7 @@ void *listen_peer_connections(void *p) {
   struct sockaddr_in address;
   // listener_attr_t *attribute;
   int port = *(int *) p;
+  char *peer_id = (char *)calloc(4, sizeof(char));
   // int port = (int) p;
 
   // Creating socket file descriptor
@@ -166,6 +170,7 @@ void *listen_peer_connections(void *p) {
   }
   if (listen(sockfd, QUEUED_CONNECTIONS) != 0) {
     perror("listen failed");
+    if (peer_id) { free(peer_id); }
     return EXIT_FAILURE;
   }
   while (1) { // listening for new peers
@@ -194,18 +199,24 @@ void *listen_peer_connections(void *p) {
     // attribute = malloc(sizeof(attribute));
     // attribute->socket = newsockfd;
     // attribute->channel = channel;
-    char *peer_id = (char *)calloc(4, sizeof(char));
+    // peer_id = (char *)calloc(4, sizeof(char));
     if (read(newsockfd, peer_id, 4) != 4) {
       perror("Could not connect to peer: ");
+      if (peer_id) { free(peer_id); }
       return -1;
     };
     write(newsockfd, (void *)&node_id, 4); // send the peer our node_id; client should send first, so this server reads first
     peers[peer_index].valid = 1;
-    peers[peer_index].peer_node_id = atoi(peer_id);
+    // peers[peer_index].peer_node_id = atoi(peer_id);
+    peers[peer_index].peer_node_id = *(int*)peer_id;
     peers[peer_index].sock = newsockfd;
     peers[peer_index].request_lock_pending = 0;
     peers[peer_index].sem = (sem_t *) calloc(sizeof(sem_t), sizeof(char));
-    if (sem_init(peers[peer_index].sem, 0, 0)) { perror("Could not init semaphore\n"); return -1; }
+    if (sem_init(peers[peer_index].sem, 0, 0)) {
+      perror("Could not init semaphore\n");
+      if (peer_id) { free(peer_id); }
+      return -1;
+    }
     pthread_t *listener_thread = (pthread_t *) malloc(sizeof(pthread_t));
     pthread_create(listener_thread, NULL, peer_message_listen, (void *) &peers[peer_index]);
     // if (pthread_create(listener_thread, NULL, peer_message_listen, (void *) attribute) != 0) { // hand off to another thread to monitor this socket
@@ -220,8 +231,12 @@ void *listen_peer_connections(void *p) {
     //   return -1;
     // }
     // peer_index++; // dont need this with next_peer_index()
+    printf("Accepted connection from peer: [%d]\n", *(int*)peer_id);
+    free(peer_id);
+    peer_id = (char *)calloc(4, sizeof(char));
   }
 
+  if (peer_id) { free(peer_id); }
   return 0;
 }
 
@@ -281,11 +296,13 @@ void *peer_message_listen(void *arg) {
   // reset sem for this peer
   // decrement connected_peer
   // note: need better mechanism for identifying this peer in each array (could just search thru connected_socks for index to all)
-  if (reset_peer() != 0) {
+  printf("Disconnected from peer [%d]\nResetting peer node...\n", peer->peer_node_id);
+  if (reset_peer(peer) != 0) {
     perror("Error resetting peer after disconnection: ");
   }
+  printf("Node clean.\n");
 
-  free(arg); // malloc'd in listen_peer_connections
+  // free(arg); // malloc'd in listen_peer_connections;---- no dont free this, its on stack
   // attribute = NULL;
   free(peer_msg_buf);
   free(peer_msg);
@@ -669,12 +686,16 @@ int init_peer_array() {
 }
 
 int reset_peer(peer_t *peer) {
+  if (peer == NULL) {
+    printf("Peer is null.\n");
+    return -1;
+  }
   peer->valid = 0;
   peer->peer_node_id = -1;
   close(peer->sock);
   peer->sock = -1;
   peer->request_lock_pending = 0;
-  free(peer->sem);
+  if (peer->sem) { free(peer->sem); }
   peer->sem = NULL;
 
   return 0;

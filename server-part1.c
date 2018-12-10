@@ -519,8 +519,17 @@ int run_server_1(int num_peer_args, char *peer_list[]) {
         perror("Could not begin listening for peers:");
         return EXIT_FAILURE;
     }
+
+    if (num_peer_args == 0) {
+      printf("No peers specified to connect to.\n");
+    }
+
     for (int i = 0; i < num_peer_args; i++) {
-      connect_peer(peer_list[i], atoi(peer_list[i + 1]));
+      if (connect_peer(peer_list[i], atoi(peer_list[i + 1])) == 0) {
+        // printf("Connected to peer: [%s:%s]\n", peer_list[i], peer_list[i + 1]);
+      } else {
+        // printf("Could not connect to peer: [%s:%s]\n", peer_list[i], peer_list[i + 1]);
+      }
       i++;
     }
   }

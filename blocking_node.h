@@ -182,6 +182,6 @@ int unmarshall_pm(char *buffer, peer_message_t *message);
 
 int next_peer_index(); // return index of next 'available' peer node in our array; return -1 on fail/not accepting anymore peer connections; maybe add timeout field to peers and check timeout values to evict old ones
 int init_peer_array(); // initializes all the fields of all the peer nodes of our array
-int reset_peer(); // reset fields of peer node; occurs if we disconnect from a peer for whatever reason
+int reset_peer(peer_t *peer); // reset fields of peer node; occurs if we disconnect from a peer for whatever reason
 
 #endif //P3_CSRF_CLIENT_BLOCKING_H
