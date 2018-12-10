@@ -5,7 +5,7 @@ LINKFLAGS=-L. -g3 -ggdb -std=gnu99 -pthread -L/opt/local/lib -L./libapr/lib
 LIBFLAGS=-shared -Wall -pthread
 LINKLIBS=-lm -lrt -lpthread #-lapr-2
 ARCHIVE=ar
-TARGETS=server client client17 #client_blocking
+TARGETS=server client blocking_client #client_blocking
 OBJECTS= server-main.o \
 			cache.o \
 			c1.o \
@@ -40,7 +40,7 @@ libds.a: $(LIBDS_OBJS)
 	$(ARCHIVE) s $@ $^
 
 client: client.c
-	gcc -g -std=gnu99 client.c -o client -pthread -lm
+	gcc -g -std=gnu99 abd.c client.c -o client -pthread -lm
 
 client_blocking: blocking_node.o $(LIBS)
 	$(LINK) $(LINKFLAGS) $^ $(LINKLIBS) -o $@
@@ -69,5 +69,8 @@ client8: client8.c
 client17: client17.c
 	gcc -g -std=gnu99 client17.c -o client17 -pthread
 
+blocking_client: blocking_client.c
+	gcc -g -std=gnu99 blocking_client.c -o blocking_client -pthread -lm
+
 clean:
-	rm server client *.o abdunit client2 client3 client4 client5 client6 client7 client8 client17 libds.a
+	rm server client *.o abdunit client2 client3 client4 client5 client6 client7 client8 client17 blocking_client libds.a

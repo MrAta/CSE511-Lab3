@@ -21,7 +21,7 @@ typedef struct {
   int valid;
   int peer_node_id;
   int sock;
-  int request_lock_pending;
+  int peer_request_lock_pending;
   sem_t *sem;
 } peer_t;
 

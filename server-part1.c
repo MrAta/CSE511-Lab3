@@ -7,7 +7,7 @@
 
 #define CLOCKID CLOCK_REALTIME
 #define SIG (SIGRTMIN + 3)
-#define TIMER_FREQ_S 240 // change this back
+#define TIMER_FREQ_S 10 // change this back
 // #define C0_SIZE_TRSH 4
 #define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
                         } while (0)

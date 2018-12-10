@@ -141,7 +141,7 @@ int distributed_unlock();
  * @return 0 if successful; 1 if failed.
  */
 // int server_write_request(char *key, char *value); // ********
-int server_write_request(peer_message_t *message); // ********
+// int server_write_request(peer_message_t *message); // ********
 
 // // TODO: Quinn Implement
 // /**
@@ -160,7 +160,7 @@ int initialize_blocking_node();
 
 void update_timestamp(uint32_t new_timestamp);
 
-void *request_lock_handler(void *peer);
+// void *request_lock_handler(void *peer);
 
 /************** DATA STRUCTURE FUNCTIONS **************/
 // TODO: @Quinn implement
