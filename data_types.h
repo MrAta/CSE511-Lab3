@@ -6,6 +6,7 @@
 #define P3_CSRF_DATA_TYPES_H
 
 #include <stdint.h>
+#include <semaphore.h>
 // #include "apr/include/apr_queue.h"
 #include "common.h"
 
@@ -15,6 +16,14 @@ typedef struct {
   int socket;
   // apr_queue_t *channel;
 } listener_attr_t;
+
+typedef struct {
+  int valid;
+  int peer_node_id;
+  int sock;
+  int request_lock_pending;
+  sem_t *sem;
+} peer_t;
 
 typedef enum {
   REQUEST_LOCK, // Requests a lock

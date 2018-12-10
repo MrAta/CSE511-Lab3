@@ -9,18 +9,19 @@
 // GLOBAL VARIABLES
 // apr_queue_t *channel;
 // apr_pool_t *allocator;
-int connected_peers;
-int connected_socks[MAX_PEERS];
+int peer_index;
+// int connected_socks[MAX_PEERS];
+peer_t peers[MAX_PEERS];
 // int waiting_index[MAX_PEERS];
 pqueue *lock_queue;
 uint32_t timestamp;
-int locked;
-sem_t *sem[MAX_PEERS];
+// int locked;
+// sem_t *sem[MAX_PEERS];
 pthread_mutex_t *mutex;
 pthread_mutex_t ts_mutex;
-pthread_mutex_t c_mutex;
+pthread_mutex_t lp_mutex;
 pthread_mutex_t pq_mutex;
-int rq_locks_pending[MAX_PEERS] = { 0 };
+// int rq_locks_pending[MAX_PEERS] = { 0 };
 uint32_t node_id = 0;
 
 
@@ -38,7 +39,12 @@ int initialize_blocking_node() {
 
   // INITIALIZE GLOBAL VARIABLES
   timestamp = 0;
-  connected_peers = 0;
+  peer_index = 0;
+
+  if (init_peer_array() != 0) {
+    perror("Error initializing peer array: ");
+    return -1;
+  }
 
   pthread_mutex_init(mutex, NULL);
 
@@ -46,11 +52,6 @@ int initialize_blocking_node() {
 }
 
 int connect_server(char *ip, int port) {
-  //
-  //
-  // LOCAL VARIABLES
-  //
-  //
   struct sockaddr_in *serv_addr;
   int sock;
 
@@ -77,37 +78,55 @@ int connect_server(char *ip, int port) {
 }
 
 int connect_peer(char *ip, int port) {
-  //
-  //
-  // LOCAL VARIABLES
-  //
-  //
+  // int idx = next_peer_index();
+  peer_index = next_peer_index();
+  // if (idx == -1) {
+  if (peer_index == -1) {
+    printf("Cannot connect to anymore peers. Disconnect from 1 or more to connect to another.");
+    return -1;
+  }
+  // peer_index = idx;
+
   int sock;
-  pthread_t listener_thread;
-  listener_attr_t *attribute;
+  // pthread_t listener_thread;
+  // listener_attr_t *attribute;
 
   sock = connect_server(ip, port);
   if (sock == -1) {
     printf("Client (peer) connect failed\n");
-    return 1;
+    return -1;
   }
-  attribute = malloc(sizeof(listener_attr_t));
-  attribute->socket = sock;
+  // attribute = malloc(sizeof(listener_attr_t));
+  // attribute->socket = sock;
   // attribute->channel = channel;
-  pthread_create(&listener_thread, NULL, peer_message_listen, (void *) attribute);
-  connected_socks[connected_peers] = sock;
+  write(sock, (void *)&node_id, 4); // send the peer our node_id
+  char *peer_id = (char *)calloc(4, sizeof(char));
+  if (read(sock, peer_id, 4) != 4) {
+    printf("Could not connect to peer [%s]: ", ip);
+    return -1;
+  };
+  peers[peer_index].valid = 1;
+  peers[peer_index].peer_node_id = atoi(peer_id);
+  peers[peer_index].sock = sock;
+  peers[peer_index].request_lock_pending = 0;
+  peers[peer_index].sem = (sem_t *) calloc(sizeof(sem_t), sizeof(char));
+  if (sem_init(peers[peer_index].sem, 0, 0)) { perror("Could not init semaphore\n"); return -1; }
+  pthread_t *listener_thread = (pthread_t *) malloc(sizeof(pthread_t));
+  // pthread_create(listener_thread, NULL, peer_message_listen, (void *) attribute);
+  pthread_create(listener_thread, NULL, peer_message_listen, (void *) &peers[peer_index]); // send address of this peers array element to the listener thread
+  // connected_socks[peer_index] = sock;
   // INITIALIZE GLOBAL SEMAPHORES
-//  if (( sem[connected_peers] = sem_open("bl_wait_sem", O_CREAT | O_EXCL, 0, 0)) ==
+//  if (( sem[peer_index] = sem_open("bl_wait_sem", O_CREAT | O_EXCL, 0, 0)) ==
 //      SEM_FAILED) {
 //    perror("Could not open semaphore\n");
 //    return -1;
 //  }
-  sem[connected_peers] = malloc(sizeof(sem_t));
-  if (sem_init(sem[connected_peers], 0, 0)) {
-    perror("Could not open semaphore\n");
-    return -1;
-  }
-  connected_peers++;
+  // sem[peer_index] = malloc(sizeof(sem_t));
+  // if (sem_init(sem[peer_index], 0, 0)) {
+  //   perror("Could not open semaphore\n");
+  //   return -1;
+  // }
+  // peer_index++; // dont need this with next_peer_index()
   return 0;
 }
 
@@ -119,7 +138,7 @@ void *listen_peer_connections(void *p) {
   //
   int sockfd, opt;
   struct sockaddr_in address;
-  listener_attr_t *attribute;
+  // listener_attr_t *attribute;
   int port = *(int *) p;
   // int port = (int) p;
 
@@ -151,32 +170,56 @@ void *listen_peer_connections(void *p) {
   }
   while (1) { // listening for new peers
 
-    if (connected_peers > MAX_PEERS) { continue; } // TODO: what else here?
+    // if (peer_index > MAX_PEERS) { continue; } // TODO: what else here?
 
     socklen_t cli_addr_size = sizeof(address);
     int newsockfd = accept(sockfd, (struct sockaddr *) &address, &cli_addr_size);
     printf("Got new connection\n");
+
+    // int idx = next_peer_index();
+    peer_index = next_peer_index();
+    // if (idx == -1) {
+    if (peer_index == -1) {
+      printf("Cannot connect to anymore peers. Disconnect from 1 or more to connect to another.");
+      close(newsockfd);
+      continue;
+      // return -1; // dont return on the listener
+    }
+    // peer_index = idx;
+
     if (newsockfd < 0) {
       perror("Could not accept connection");
       continue;
     }
-    attribute = malloc(sizeof(attribute));
-    attribute->socket = newsockfd;
+    // attribute = malloc(sizeof(attribute));
+    // attribute->socket = newsockfd;
     // attribute->channel = channel;
-    pthread_t *handler_thread = (pthread_t *) malloc(sizeof(pthread_t));
-    if (pthread_create(handler_thread, NULL, peer_message_listen, (void *) attribute) !=
-        0) { // hand off to another thread to monitor this socket
-      perror("Could not start handler");
-      continue;
-    }
-    connected_socks[connected_peers] = newsockfd;
-    // INITIALIZE GLOBAL SEMAPHORES
-    sem[connected_peers] = malloc(sizeof(sem_t));
-    if (sem_init(sem[connected_peers], 0, 0)) {
-      perror("Could not open semaphore\n");
+    char *peer_id = (char *)calloc(4, sizeof(char));
+    if (read(newsockfd, peer_id, 4) != 4) {
+      perror("Could not connect to peer: ");
       return -1;
-    }
-    connected_peers++;
+    };
+    write(newsockfd, (void *)&node_id, 4); // send the peer our node_id; client should send first, so this server reads first
+    peers[peer_index].valid = 1;
+    peers[peer_index].peer_node_id = atoi(peer_id);
+    peers[peer_index].sock = newsockfd;
+    peers[peer_index].request_lock_pending = 0;
+    peers[peer_index].sem = (sem_t *) calloc(sizeof(sem_t), sizeof(char));
+    if (sem_init(peers[peer_index].sem, 0, 0)) { perror("Could not init semaphore\n"); return -1; }
+    pthread_t *listener_thread = (pthread_t *) malloc(sizeof(pthread_t));
+    pthread_create(listener_thread, NULL, peer_message_listen, (void *) &peers[peer_index]);
+    // if (pthread_create(listener_thread, NULL, peer_message_listen, (void *) attribute) != 0) { // hand off to another thread to monitor this socket
+    //   perror("Could not start handler");
+    //   continue;
+    // }
+    // connected_socks[peer_index] = newsockfd;
+    // INITIALIZE GLOBAL SEMAPHORES
+    // sem[peer_index] = malloc(sizeof(sem_t));
+    // if (sem_init(sem[peer_index], 0, 0)) {
+    //   perror("Could not open semaphore\n");
+    //   return -1;
+    // }
+    // peer_index++; // dont need this with next_peer_index()
   }
 
   return 0;
@@ -187,14 +230,16 @@ void *peer_message_listen(void *arg) {
   // *** expecting messages of the form: message_type, timestamp, node_id, key, [value]
   // loop while still receiving peer messages (until peer socket closes)
 
-  listener_attr_t *attribute = (listener_attr_t *) arg;
+  // listener_attr_t *attribute = (listener_attr_t *) arg;
+  peer_t *peer = (peer_t *) arg;
   char *peer_msg_buf = (char *) calloc(MAX_MESSAGE_SIZE, sizeof(char));
   peer_message_t *peer_msg = (peer_message_t *) calloc(sizeof(peer_message_t), sizeof(char));
   char *response = NULL;
   int response_size;
   transaction txn;
 
-  while (read(attribute->socket, peer_msg_buf, MAX_MESSAGE_SIZE) > 0) {
+  // while (read(attribute->socket, peer_msg_buf, MAX_MESSAGE_SIZE) > 0) {
+  while (read(peer->sock, peer_msg_buf, MAX_MESSAGE_SIZE) > 0) {
     if (unmarshall_pm(peer_msg_buf, peer_msg) != 0) {
       perror("Error during unmarshall_pm:");
       free(peer_msg_buf);
@@ -207,7 +252,8 @@ void *peer_message_listen(void *arg) {
       continue;
     }
 
-    if (handle_peer_message(peer_msg, attribute) != 0) {
+    // if (handle_peer_message(peer_msg, attribute) != 0) {
+    if (handle_peer_message(peer_msg, peer) != 0) {
       perror("Error during handle_peer_message:");
       free(peer_msg_buf);
       free(peer_msg);
@@ -235,15 +281,18 @@ void *peer_message_listen(void *arg) {
   // reset sem for this peer
   // decrement connected_peer
   // note: need better mechanism for identifying this peer in each array (could just search thru connected_socks for index to all)
+  if (reset_peer() != 0) {
+    perror("Error resetting peer after disconnection: ");
+  }
 
   free(arg); // malloc'd in listen_peer_connections
-  attribute = NULL;
+  // attribute = NULL;
   free(peer_msg_buf);
   free(peer_msg);
   peer_msg_buf = NULL;
   peer_msg = NULL;
   response = NULL;
-  close(attribute->socket);
+  // close(attribute->socket);
   return NULL;
 }
 
@@ -253,7 +302,7 @@ int distributed_lock() { // used by client-server handler thread right (?)
   // LOCAL VARIABLES
   //
   //
-  peer_message_t *msg;
+  // peer_message_t *msg;
 //  char *msg_buf;
 //  int size;
 
@@ -265,21 +314,21 @@ int distributed_lock() { // used by client-server handler thread right (?)
   // }
 
   // CREATE NEW REQUEST OBJECT
-  msg = malloc(sizeof(peer_message_t));
+  peer_message_t *msg = malloc(sizeof(peer_message_t));
   msg->timestamp = timestamp;
   msg->node_id = node_id;
   msg->message_type = REQUEST_LOCK;
   msg->key = (char *) calloc(1, sizeof(char));
   msg->value = (char *) calloc(1, sizeof(char));
-  msg->write_type = -1;
+  // msg->write_type = -1;
+  msg->write_type = 0;
 
   // ADD REQUEST TO Q_{node_id}
   pthread_mutex_lock(&pq_mutex);
-  if (enqueue(lock_queue,
-              msg)) { // TODO: this is thread safe queue right? -- allow threads to enqueue their messages so they can be served the lock in correct order
+  if (enqueue(lock_queue, msg)) { // TODO: this is thread safe queue right? -- allow threads to enqueue their messages so they can be served the lock in correct order
     printf("Enqueue to PQ failed\n");
     // pthread_mutex_unlock(mutex);
-    return 1;
+    return -1;
   }
   pthread_mutex_unlock(&pq_mutex);
 
@@ -290,40 +339,42 @@ int distributed_lock() { // used by client-server handler thread right (?)
 //  }
   pthread_mutex_lock(mutex);
   update_timestamp(timestamp + 1); // TODO: do we need lock around updates to timestamp?
-  for (int i = 0; i < connected_peers; i++) {
-    if (send_peer_message(msg,
-                          connected_socks[i])) { // might be issue here if node_id doesnt match the connected_peers counter value
-      printf("Could not send lock request to node: %d\n", i);
+  for (int i = 0; i < MAX_PEERS; i++) {
+    if (!peers[i].valid) {
+      continue;
+    }
+    if (send_peer_message(msg, peers[i].sock) != 0) { // might be issue here if node_id doesnt match the peer_index counter value
+      printf("Could not send lock request to node: %d\n", peers[i].peer_node_id);
       pthread_mutex_unlock(mutex);
       return -1;
     }
-    sem_wait(sem[i]); // set lock for all peers (effectively the same as waiting_index)
+    sem_wait(peers[i].sem); // set lock for all peers (effectively the same as waiting_index)
     // waiting_index[i] = 1;
   }
 //  if (broadcast_message(msg_buf, size)) {
 //    printf("Could not broadcast message\n");
 //    return 1;
 //  }
-  for (int i = 0; i <
-                  connected_peers; i++) { // might be issue here if node_id doesnt match the connected_peers counter value
-    if (sem_wait(
-      sem[i])) { // wait until we are able to acquire lock for all peers (i.e. we have received REPLY_LOCK from all of them and sem_post'ed them)
+  for (int i = 0; i < MAX_PEERS; i++) { // might be issue here if node_id doesnt match the peer_index counter value
+    if (!peers[i].valid) {
+      continue;
+    }
+    if (sem_wait(peers[i].sem) != 0) { // wait until we are able to acquire lock for all peers (i.e. we have received REPLY_LOCK from all of them and sem_post'ed them)
       perror("Could not block on semaphore\n");
       pthread_mutex_unlock(mutex);
-      return 1;
+      return -1;
     }
-    sem_post(sem[i]); // unlock; heard from this peer and next thread can send to this peer
+    sem_post(peers[i].sem); // unlock; heard from this peer and next thread can send to this peer
 
     // if we are waiting on a REPLY_LOCK and a peer helper thread receives a REQUEST_LOCK it will set the locks pending flag so that once the peer helper thread receives a REPLY_LOCK, posts sem, then this sem_wait passes above -> we will send the peer the REPLY_LOCK they are waiting for
 
     // check if we have a REQUEST_LOCK to handle for this peer
-    pthread_mutex_lock(
-      &c_mutex); // c_mutex is for synch b/w helper peer threads and client-server helper threads on this flag array
-    if (rq_locks_pending[i]) {
-      handle_request_lock(i);
-      rq_locks_pending[i] = 0;
+    pthread_mutex_lock(&lp_mutex); // lp_mutex is for synch b/w helper peer threads and client-server helper threads on this flag array
+    if (peers[i].request_lock_pending) {
+      handle_request_lock(&peers[i]);
+      peers[i].request_lock_pending = 0;
     }
-    pthread_mutex_unlock(&c_mutex);
+    pthread_mutex_unlock(&lp_mutex);
   }
   pthread_mutex_unlock(mutex);
 
@@ -341,7 +392,7 @@ int distributed_lock() { // used by client-server handler thread right (?)
   }
   // while (peek(lock_queue) == msg); // only one thread has mutex so only one thread can spin here, the rest will wait at mutex_lock above, should be fine except other threads wont be able to get their REQUEST_LOCK messages out while we're spinning
 
-  // NOW IN CRITICAL SECTION
+  // NOW IN CRITICAL SECTION // ************
 
   // TODO: dont need anymore? being at the head of pqueue means you have lock
   // locked = 1;
@@ -356,23 +407,26 @@ int distributed_unlock() {
   // LOCAL VARIABLES
   //
   //
-  peer_message_t *msg;
+  // peer_message_t *msg;
 //  char *msg_buf;
 //  int size;
 
   // POP HEAD OF Q_{node_i}
+  // TODO: should we do this here or after we send RELEASE_LOCK??? prob here
   pthread_mutex_lock(&pq_mutex);
   dequeue(lock_queue);
   pthread_mutex_unlock(&pq_mutex);
 
   // CREATE NEW REQUEST OBJECT
-  msg = malloc(sizeof(peer_message_t));
+  // msg = malloc(sizeof(peer_message_t));
+  peer_message_t *msg = malloc(sizeof(peer_message_t));
   msg->timestamp = timestamp;
   msg->node_id = node_id;
   msg->message_type = RELEASE_LOCK;
   msg->key = (char *) calloc(1, sizeof(char));
   msg->value = (char *) calloc(1, sizeof(char));
-  msg->write_type = -1;
+  // msg->write_type = -1;
+  msg->write_type = 0;
 
   // BROADCAST REQUEST TO ALL PROCESSES
 //  if (( size = marshall(&msg_buf, msg)) == 0) {
@@ -380,11 +434,13 @@ int distributed_unlock() {
 //    return 1;
 //  }
   update_timestamp(timestamp + 1);
-  for (int i = 0; i < connected_peers; i++) {
-    if (send_peer_message(msg,
-                          connected_socks[i])) { // might be issue here if node_id doesnt match the connected_peers counter value
+  for (int i = 0; i < MAX_PEERS; i++) {
+    if (!peers[i].valid) {
+      continue;
+    }
+    if (send_peer_message(msg, peers[i].sock) != 0) { // might be issue here if node_id doesnt match the peer_index counter value
       printf("Could not send lock request to node: %d\n", i);
-      return -1;
+      return -1; // spin until we are able to send all RELEASE_LOCKs
     }
   }
 //  if (broadcast_message(msg_buf, size)) {
@@ -400,7 +456,8 @@ int distributed_unlock() {
   return 0;
 }
 
-int handle_peer_message(peer_message_t *message, listener_attr_t *attribute) {
+// int handle_peer_message(peer_message_t *message, listener_attr_t *attribute) {
+int handle_peer_message(peer_message_t *message, peer_t *peer) {
   update_timestamp(message->timestamp);
   switch (message->message_type) {
     case REQUEST_LOCK:
@@ -409,24 +466,25 @@ int handle_peer_message(peer_message_t *message, listener_attr_t *attribute) {
       enqueue(lock_queue, message);
       pthread_mutex_unlock(&pq_mutex);
 
-      if (sem_trywait(sem[message->node_id]) !=
-          0) { // lock is available if we are not waiting on a REPLY_LOCK; otherwise we are, so set flag to be handled up top
-        pthread_mutex_lock(&c_mutex);
+      // if (sem_trywait(sem[message->node_id]) != 0) { // lock is available if we are not waiting on a REPLY_LOCK; otherwise we are, so set flag to be handled up top
+      if (sem_trywait(peer->sem) != 0) {
+        pthread_mutex_lock(&lp_mutex);
         // enqueue(lock_queue, message);
-        rq_locks_pending[message->node_id] = 1;
-        pthread_mutex_unlock(&c_mutex);
+        // rq_locks_pending[message->node_id] = 1;
+        peer->request_lock_pending = 1;
+        pthread_mutex_unlock(&lp_mutex);
       } else {
         // not waiting on REPLY_LOCK from them, go ahead and send REPLY_LOCK to peer
-        handle_request_lock(message->node_id);
+        // handle_request_lock(message->node_id);
+        // handle_request_lock(message, peer);
+        handle_request_lock(peer);
       }
-
       // peer_message_t *copy = (peer_message_t *) calloc(sizeof(peer_message_t), sizeof(char));
       // memcpy(copy, message, sizeof(peer_message_t));
       // pthread_t *handler_thread = (pthread_t *) malloc(sizeof(pthread_t));
       // if (pthread_create(handler_thread, NULL, handle_request_lock, (void *) copy) != 0) {
       //   perror("Could not REQUEST_LOCK handler:");
       // }
-
       return 0;
 
     case RELEASE_LOCK:
@@ -436,8 +494,8 @@ int handle_peer_message(peer_message_t *message, listener_attr_t *attribute) {
       return 0;
 
     case REPLY_LOCK:
-      sem_post(
-        sem[message->node_id]); // done waiting for reply from message->node_id (some server node)
+      // sem_post(sem[message->node_id]); // done waiting for reply from message->node_id (some server node)
+      sem_post(peer->sem);
       // waiting_index[message->node_id] = 0;
       return 0;
 
@@ -450,13 +508,14 @@ int handle_peer_message(peer_message_t *message, listener_attr_t *attribute) {
     default:
       printf("You've  made a grave mistake. I cannot handle this\n");
       assert(0);
-      return 1;
+      return -1;
       //write(attribute->socket, "ERROR", 6);
   }
 }
 
 // void *handle_request_lock(void *arg) {
-int handle_request_lock(int nid) {
+// int handle_request_lock(int nid) {
+int handle_request_lock(peer_t *peer) {
   // peer_message_t *incoming_message = (peer_message_t *) arg;
   peer_message_t *outgoing_message;
 
@@ -478,9 +537,9 @@ int handle_request_lock(int nid) {
   outgoing_message->timestamp = timestamp;
   outgoing_message->key = (char *) calloc(1, sizeof(char));
   outgoing_message->value = (char *) calloc(1, sizeof(char));
-  outgoing_message->write_type = -1;
+  outgoing_message->write_type = 0;
 
-  send_peer_message(outgoing_message, connected_socks[nid]);
+  send_peer_message(outgoing_message, peer->sock);
 
   // free(incoming_message);
   free(outgoing_message);
@@ -526,8 +585,7 @@ int unmarshall_pm(char *peer_msg_buf, peer_message_t *peer_msg) {
   peer_msg->value = (char *) calloc(strlen(k), sizeof(char));
   memcpy(peer_msg->value, k, strlen(k));
 
-  peer_msg->write_type = atoi(
-    strtok_r(NULL, " ", &save_ptr)); // will break on \0 term, no space at end
+  peer_msg->write_type = atoi(strtok_r(NULL, " ", &save_ptr)); // will break on \0 term, no space at end
 
   return 0;
 }
@@ -553,12 +611,14 @@ int broadcast_write(char *key, char *value, int write_type) {
 
   msg->write_type = write_type;
 
-  for (int i = 0; i < connected_peers; i++) {
-    if (send_peer_message(msg,
-                          connected_socks[i])) { // might be issue here if node_id doesnt match the connected_peers counter value
+  for (int i = 0; i < MAX_PEERS; i++) {
+    if (!peers[i].valid) {
+      continue;
+    }
+    if (send_peer_message(msg, peers[i].sock) != 0) { // might be issue here if node_id doesnt match the peer_index counter value
       printf("Could not send SERVER_WRITE to node: %d\n", i);
-      // return -1; // ??
-      continue; // continue or stop?
+      return -1; // ??
+      // continue; // continue or stop? prob should keep spinning on this until we are able to send SERVER_WRITE to all servers
     }
   }
 
@@ -573,3 +633,39 @@ int broadcast_write(char *key, char *value, int write_type) {
 // int main() {
 //   return 0;
 // }
+
+int next_peer_index() {
+  int idx = -1;
+  for (int i = 0; i < MAX_PEERS; i++) {
+    if (peers[i].valid == 0) {
+      idx = i;
+      break;
+    }
+  }
+
+  return idx;
+}
+
+int init_peer_array() {
+  for (int i = 0; i < MAX_PEERS; i++) {
+    peers[i].valid = 0;
+    peers[i].peer_node_id = -1;
+    peers[i].sock = -1;
+    peers[i].request_lock_pending = 0;
+    peers[i].sem = NULL;
+  }
+
+  return 0;
+}
+
+int reset_peer(peer_t *peer) {
+  peer->valid = 0;
+  peer->peer_node_id = -1;
+  close(peer->sock);
+  peer->sock = -1;
+  peer->request_lock_pending = 0;
+  free(peer->sem);
+  peer->sem = NULL;
+
+  return 0;
+}

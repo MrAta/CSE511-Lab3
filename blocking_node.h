@@ -14,7 +14,6 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <math.h>
-#include <semaphore.h>
 #include <fcntl.h>
 // #include "apr-2/include/apr_queue.h"
 #include "journal.h"
@@ -113,13 +112,16 @@ int send_peer_message(peer_message_t *message, int sock);
  * @param message a parsed message struct containing data from a node
  * @return 0 if success; 1 if failure
  */
-int handle_peer_message(peer_message_t *message, listener_attr_t *attribute);
+// int handle_peer_message(peer_message_t *message, listener_attr_t *attribute);
+int handle_peer_message(peer_message_t *message, peer_t *peer);
 
 /**
  * Takes the needed action upon receiving a REQUEST message type.
  */
 // void *handle_request_lock(void *arg);
-int handle_request_lock(int nid);
+// int handle_request_lock(int nid);
+// int handle_request_lock(peer_message_t *message, peer_t *peer);
+int handle_request_lock(peer_t *peer);
 
 /**
  * Sends an unlocking request to the rest of the nodes in the swarm
@@ -176,5 +178,8 @@ int marshall_pm(char **buffer, peer_message_t *message);
  */
 int unmarshall_pm(char *buffer, peer_message_t *message);
 
+int next_peer_index(); // return index of next 'available' peer node in our array; return -1 on fail/not accepting anymore peer connections; maybe add timeout field to peers and check timeout values to evict old ones
+int init_peer_array(); // initializes all the fields of all the peer nodes of our array
+int reset_peer(); // reset fields of peer node; occurs if we disconnect from a peer for whatever reason
 
 #endif //P3_CSRF_CLIENT_BLOCKING_H

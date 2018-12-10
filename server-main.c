@@ -55,6 +55,7 @@ int main(int argc, char *argv[]) {
     printf("Beginning [blocking] server...\n");
   } else {
     printf("Invalid arguments.\n");
+    return -1;
   }
 
   printf("Waiting for new connections...\n");
