@@ -59,7 +59,7 @@ int loop_and_listen_1();
  * @param blocking 1 if run the servers with ABD protocol
  * @return 0 if success 1 if failure
  */
-int run_server_1();
+int run_server_1(int num_peer_args, char *peer_list[]);
 
 /**
  * Setup signal mask for helper threads (blocking handler) then call server helper

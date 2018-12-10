@@ -470,7 +470,7 @@ int loop_and_listen_1() {
   }
 }
 
-int run_server_1() {
+int run_server_1(int num_peer_args, char *peer_list[]) {
   // Load database
   head = tail = temp_node = NULL;
   // _T = NULL;
@@ -513,10 +513,15 @@ int run_server_1() {
   if (blocking) {
     if (initialize_blocking_node() != 0) { return EXIT_FAILURE; }
     pthread_t *peer_handler_thread = (pthread_t *) malloc(sizeof(pthread_t));
-    int p = PEER_PORT;
-    if (pthread_create(peer_handler_thread, NULL, listen_peer_connections, (void *) &p) != 0) { // *** begin listening for peer connections
+    int *p = malloc(sizeof(int));
+    *p = PEER_PORT;
+    if (pthread_create(peer_handler_thread, NULL, listen_peer_connections, (void *) p) != 0) { // *** begin listening for peer connections
         perror("Could not begin listening for peers:");
         return EXIT_FAILURE;
+    }
+    for (int i = 0; i < num_peer_args; i++) {
+      connect_peer(peer_list[i], atoi(peer_list[i + 1]));
+      i++;
     }
   }
   if (loop_and_listen_1()) { // *** begin listening for client connections

@@ -111,7 +111,7 @@ int connect_peer(char *ip, int port) {
   return 0;
 }
 
-void *listen_peer_connections(int p) {
+void *listen_peer_connections(void *p) {
   //
   //
   // LOCAL VARIABLES

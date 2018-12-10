@@ -70,7 +70,7 @@ int connect_peer(char *ip, int port);
  * @param port Port to listen on
  * @return 0 if successful, 1 if failure
  */
-void *listen_peer_connections(int port);
+void *listen_peer_connections(void *port);
 
 // TODO: @Quinn Implement
 /**
