@@ -271,7 +271,7 @@ void *peer_message_listen(void *arg) {
       peer_msg_buf = NULL;
       peer_msg_buf = (char *) calloc(MAX_MESSAGE_SIZE, sizeof(char *));
       peer_msg = NULL;
-      peer_msg = (char *) calloc(sizeof(peer_message_t), sizeof(char *));
+      peer_msg = (peer_message_t *) calloc(sizeof(peer_message_t), sizeof(char *));
       response = NULL;
       continue;
     }
@@ -284,7 +284,7 @@ void *peer_message_listen(void *arg) {
       peer_msg_buf = NULL;
       peer_msg_buf = (char *) calloc(MAX_MESSAGE_SIZE, sizeof(char *));
       peer_msg = NULL;
-      peer_msg = (char *) calloc(sizeof(peer_message_t), sizeof(char *));
+      peer_msg = (peer_message_t *) calloc(sizeof(peer_message_t), sizeof(char *));
       response = NULL;
       continue;
     }
@@ -509,6 +509,13 @@ int distributed_unlock() {
 
 // int handle_peer_message(peer_message_t *message, listener_attr_t *attribute) {
 int handle_peer_message(peer_message_t *message, peer_t *peer) {
+  //
+  //
+  // LOCAL VARIABLES
+  //
+  //
+  char *buf;
+  int size;
   update_timestamp(message->timestamp);
   switch (message->message_type) {
     case REQUEST_LOCK:
@@ -560,7 +567,18 @@ int handle_peer_message(peer_message_t *message, peer_t *peer) {
       // check that incoming_message->node_id == peek(lock_queue)->node_id
       if (message->node_id == peek(
         lock_queue)->node_id) { // only act if the SERVER_WRITE is coming from the server that holds the lock; otherwise ignore
-        return server_write_request(message);
+        switch (message->write_type) {
+          case INSERT:
+            return server_1_insert_request(message->key, message->value, &buf, &size);
+          case PUT:
+            return server_1_put_request(message->key, message->value, &buf, &size);
+          case DELETE:
+            return server_1_delete_request(message->key, &buf, &size);
+          default:
+            printf("Bad request for server write\n");
+            return -1;
+        }
+//        return server_write_request(message);
       } else {
         printf("Got a write req from someone who doesn't have the lock\n");
       }
@@ -717,23 +735,34 @@ int send_peer_message(peer_message_t *message, int sock) {
 int broadcast_write(char *key, char *value, int write_type) {
   peer_message_t *msg = malloc(sizeof(peer_message_t));
   msg->node_id = node_id;
-  msg->message_type = write_type;
+  msg->message_type = SERVER_WRITE;
   msg->timestamp = timestamp;
 
-  if (key) { msg->key = (char *) calloc(strlen(key), sizeof(char)); }
-  else { msg->key = (char *) calloc(1, sizeof(char)); }
+  if (key) {
+    msg->key = (char *) calloc(strlen(key), sizeof(char));
+    strcpy(msg->key, key);
+  } else {
+    msg->key = (char *) calloc(2, sizeof(char));
+    strncpy(msg->key, "1", 2);
+  }
 
-  if (value) { msg->value = (char *) calloc(strlen(value), sizeof(char)); }
-  else { msg->value = (char *) calloc(1, sizeof(char)); }
+  if (value) {
+    msg->value = (char *) calloc(strlen(value), sizeof(char));
+    strcpy(msg->value, value);
+  } else {
+    msg->value = (char *) calloc(2, sizeof(char));
+    strncpy(msg->value, "1", 2);
+  }
 
   msg->write_type = write_type;
+  update_timestamp(timestamp + 1);
 
   for (int i = 0; i < MAX_PEERS; i++) {
     if (!peers[i].valid) {
       continue;
     }
-    if (send_peer_message(msg, peers[i].sock) !=
-        0) { // might be issue here if node_id doesnt match the peer_index counter value
+    if (send_peer_message(msg, peers[i].sock) != 0) {
+      // might be issue here if node_id doesnt match the peer_index counter value
       printf("Could not send SERVER_WRITE to node: %d\n", i);
       return -1; // ??
       // continue; // continue or stop? prob should keep spinning on this until we are able to send SERVER_WRITE to all servers
