@@ -13,8 +13,8 @@
 
 #include "common.h"
 
-// #define TARGET_ADDR "172.17.0.2"
-#define TARGET_ADDR "127.0.0.1"
+#define TARGET_ADDR "172.17.0.2"
+// #define TARGET_ADDR "127.0.0.1"
 // #define PORT 8086
 #define N_KEY 37 //total number of unique keys
 #define a 1.345675 //parameter for zipf distribution to obtain a 90% populariy for 10% of the keys.

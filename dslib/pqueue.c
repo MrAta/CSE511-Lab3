@@ -4,7 +4,7 @@
 
 #include "pqueue.h"
 
-pthread_mutex_t *mutex;
+pthread_mutex_t *m_mutex;
 
 void initialize(pqueue *p) {
   reset(p);

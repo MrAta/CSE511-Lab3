@@ -160,6 +160,8 @@ int initialize_blocking_node();
 
 void update_timestamp(uint32_t new_timestamp);
 
+void *request_lock_handler(void *peer);
+
 /************** DATA STRUCTURE FUNCTIONS **************/
 // TODO: @Quinn implement
 /**
