@@ -245,7 +245,7 @@ void *client_func() {
  * @param name The key to get
  */
 void *send_abd_read_query(void * arg){
-   rq_arg * arg = (rq_arg *)(arg);
+   rq_arg * arg = (abd_arg *)(arg);
    int i = arg->node_id;
    int sock = 0, valread;
    char *gbg;
@@ -266,7 +266,7 @@ void *send_abd_read_query(void * arg){
    char cmd[MAX_ENTRY_SIZE] = "";
    char * _cmd = "GET ";
    strcat(cmd, _cmd);
-   strcat(cmd, key);   //read response
+   strcat(cmd, arg->key);   //read response
    send(sock, cmd, strlen(cmd), 0);
    valread = read(sock, buffer, MAX_ENTRY_SIZE);
    if(valread == 0){
@@ -286,26 +286,28 @@ void *send_abd_read_query(void * arg){
    //abd_tag_t * tag = malloc(sizeof(*tag));
    tag->tag = atoi(strtok_r(req_str, " ", &save_ptr);)
    tag->client_id = atoi(strtok_r(req_str, " ", &save_ptr);)
-   if(abd_tag_cmp(tag, arg->tag))
+   if(abd_tag_cmp(tag, arg->tag)){
         arg->tag = tag;
-
+      }
    pthread_mutex_unlock(&lrq_m);
+   free(req_str);
    sem_post(&rq_sem);
  }
 /**
  * Read Query to nodes for (t,v)
  * @param name The key to get
  */
-void abd_read_query(char *key){
+abd_arg * abd_read_query(char *key){
   pthread_t query_thread[NUM_NODES];
-  rq_arg * arg = malloc(sizeof(*arg));
-  arg->value = malloc(sizeof(char)*MAX_VALUE_SIZE);
+  abd_arg * arg = malloc(sizeof(*arg));
+  arg->key = key;
+  arg->value = (char*)malloc(MAX_ENTRY_SIZE * sizeof(char));
   arg->tag = malloc(sizeof(abd_tag_t));
   arg->tag->client_id = CLIENT_ID;
   arg->tag->tag = 0;
   for (int i=0; i < NUM_NODES; i++){
       pthread_mutex_lock(&lrq_m);
-      arg->node_id = i;
+      arg->node_id = i; //TODO: other way to pass node_id
       pthread_mutex_unlock(&lrq_m);
     pthread_create(&query_thread[i], NULL, send_abd_read_query, (void*)arg);
   }
@@ -314,14 +316,90 @@ void abd_read_query(char *key){
   while (sem_val < (int)NUM_NODES/2 + 1) {
     sem_getvalue(&rq_sem, &sem_val);
   }
+
   //TODO: force threads to Finished
   //TODO: reset the semaphore value
+  return arg;
 }
+
+/**
+ * Read Query to nodes for (t,v)
+ * @param name The key to get
+ */
+void *send_abd_write_query(void * arg){
+   abd_arg * arg = (rq_arg *)(arg);
+   int i = arg->node_id;
+   int sock = 0, valread;
+   char *gbg;
+
+   char buffer[MAX_ENTRY_SIZE] = {0};
+
+   if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+   {
+       printf("\n Socket creation error \n");
+       exit(0);
+   }
+
+   if (connect(sock, (struct sockaddr *)serv_addrs[i], sizeof(struct sockaddr_in)) < 0)
+   {
+       printf("\nConnection Failed \n");
+       exit(0);
+   }
+   char cmd[MAX_ENTRY_SIZE] = "";
+   char * _cmd = "PUT ";
+   strcat(cmd, _cmd);
+   strcat(cmd, arg->key);
+   char * s = " ";
+   strcat(cmd, s);   //read response
+   strcat(cmd, value);   //read response
+   send(sock, cmd, strlen(cmd), 0);
+   valread = read(sock, buffer, MAX_ENTRY_SIZE);
+   if(valread == 0){
+     printf("Socket closed\n");
+     close(sock);
+     return (void *) gbg;
+   }
+   sem_post(&wq_sem);
+ }
+
+
+wq_arg * abd_write_query(char *key, char * value){
+  pthread_t query_thread[NUM_NODES];
+  wq_arg * arg = malloc(sizeof(*arg));
+  arg->key = key;
+  arg->value = msg->value;
+  arg->tag = NULL;
+  for (int i=0; i < NUM_NODES; i++){
+      pthread_mutex_lock(&lwq_m);
+      arg->node_id = i;
+      pthread_mutex_unlock(&lwq_m);
+    pthread_create(&query_thread[i], NULL, send_abd_write_query, (void*)arg);
+  }
+  int sem_val;
+  sem_getvalue(&wq_sem, &sem_val);
+  while (sem_val < (int)NUM_NODES/2 + 1) {
+    sem_getvalue(&wq_sem, &sem_val);
+  }
+
+  //TODO: force threads to Finished
+  //TODO: reset the semaphore value
+  return arg;
+}
+
+
 /**
  * An implementation of ABD read protocol
  * @param name The key to get
  */
 void abd_read(char *key){
+  //do a read query to get the higherst tag,v
+  abd_arg * htag = abd_read_query(key);
+  char *new_value = calloc(MAX_ENTRY_SIZE + MAX_TAG_SIZE + 3, sizeof(char));
+  //write key , htag->value, htag->tag->tag, htag->tag->client-id
+  snprintf(new_value, MAX_ENTRY_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", htag->value, htag->tag->tag, htag->tag->client_id);
+  //now write "key value tag" to all servers!
+  abd_abd_write_query(key, new_value);
+
 
 }
 
@@ -331,7 +409,13 @@ void abd_read(char *key){
  * @param name The value for the given key
  * @param name The current timestamp for the client
  */
-void abd_write(char *key, char * value, long timestamp);
+void abd_write(char *key, char * value, long timestamp){
+  abd_arg * htag = abd_read_query(key);
+  snprintf(new_value, MAX_ENTRY_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", htag->value, htag->tag->tag+1, htag->tag->client_id);
+  //now write "key value tag" to all servers!
+  abd_abd_write_query(key, new_value);
+
+}
 void setup_server_addr(int i, char * target_addr){
 
   serv_addrs[i] = (struct sockaddr_in*) malloc (sizeof(struct sockaddr_in));

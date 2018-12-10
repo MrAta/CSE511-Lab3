@@ -15,12 +15,15 @@ typedef struct {
 int abd_tag_cmp(abd_tag_t *one, abd_tag_t *two);
 typedef struct {
   char * value;
+  char * key;
   abd_tag_t *tag;
 } abd_message;
 
 typedef struct{
   int node_id;
+  char * key;
   char * value;
   abd_tag_t *tag;
-} rq_arg;
+} abd_arg;
+
 #endif //P3_CSRF_ABD_H
