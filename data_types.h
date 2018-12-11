@@ -10,7 +10,7 @@
 // #include "apr/include/apr_queue.h"
 #include "common.h"
 
-#define MAX_MESSAGE_SIZE (1 + 4 + 4 + MAX_ENTRY_SIZE) // message_type, timestamp, node_id, key, [value] (value needed in this case of SERVER_WRITE)
+#define MAX_MESSAGE_SIZE (4 + 4 + 4 + 4 + MAX_ENTRY_SIZE) // message_type, timestamp, node_id, key, [value] (value needed in this case of SERVER_WRITE)
 
 typedef struct {
   int socket;

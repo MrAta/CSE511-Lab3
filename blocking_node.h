@@ -171,7 +171,7 @@ void update_timestamp(uint32_t new_timestamp);
  * @param message pointer to struct to marshall from
  * @return number of bytes written, -1 if failure
  */
-int marshall_pm(char **buffer, peer_message_t *message);
+int marshall_pm(char *buffer, peer_message_t *message);
 
 // TODO: @Quinn implement
 /**

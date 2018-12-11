@@ -240,7 +240,6 @@ void *peer_message_listen(void *arg) {
     }
 
     free(peer_msg_buf);
-    free(peer_msg);
     peer_msg_buf = NULL;
     peer_msg_buf = (char *) calloc(MAX_MESSAGE_SIZE, sizeof(char *));
     peer_msg = NULL;
@@ -272,8 +271,8 @@ int distributed_lock() {
   msg->message_type = REQUEST_LOCK;
   msg->key = (char *) calloc(2, sizeof(char));
   msg->value = (char *) calloc(2, sizeof(char));
-  memcpy(msg->key, "1", 1);
-  memcpy(msg->value, "1", 1);
+  strncpy(msg->key, "1", 2);
+  strncpy(msg->value, "1", 2);
   msg->write_type = 0;
 
   // ADD REQUEST TO Q_{node_id}
@@ -281,6 +280,8 @@ int distributed_lock() {
     printf("Enqueue to PQ failed\n");
     return -1;
   }
+  printf("Current lock queue:");
+  print(lock_queue);
   pthread_mutex_lock(m_mutex);
   requested_lock = 1;
   for (int i = 0; i < MAX_PEERS; i++) {
@@ -305,7 +306,8 @@ int distributed_lock() {
     }
     pthread_mutex_unlock(&lp_mutex);
   }
-  pthread_mutex_unlock(m_mutex); // only one thread can send REQUEST_LOCKs and wait for all responses
+  pthread_mutex_unlock(
+    m_mutex); // only one thread can send REQUEST_LOCKs and wait for all responses
 
   while (1) {
     // old --- now multiple threads can spin on queue until they get the lock;
@@ -330,18 +332,20 @@ int distributed_unlock() {
   //
 
   // POP HEAD OF Q_{node_i}
-  dequeue(lock_queue);
-
+  peer_message_t *msg = dequeue(lock_queue);
+  free(msg);
+  printf("Current lock queue:");
+  print(lock_queue);
   // CREATE NEW REQUEST OBJECT
   update_timestamp(timestamp + 1);
-  peer_message_t *msg = malloc(sizeof(peer_message_t));
+  msg = malloc(sizeof(peer_message_t));
   msg->timestamp = timestamp;
   msg->node_id = node_id;
   msg->message_type = RELEASE_LOCK;
   msg->key = (char *) calloc(2, sizeof(char));
   msg->value = (char *) calloc(2, sizeof(char));
-  memcpy(msg->key, "1", 1);
-  memcpy(msg->value, "1", 1);
+  strncpy(msg->key, "1", 2);
+  strncpy(msg->value, "1", 2);
   msg->write_type = 0;
 
   // BROADCAST REQUEST TO ALL PROCESSES
@@ -355,6 +359,7 @@ int distributed_unlock() {
       return -1; // spin until we are able to send all RELEASE_LOCKs
     }
   }
+  free(msg);
   return 0;
 }
 
@@ -375,7 +380,7 @@ int handle_peer_message(peer_message_t *message, peer_t *peer) {
       print(lock_queue);
       pthread_mutex_lock(&lp_mutex);
       if (requested_lock) { // block any request_lock until we receive all reply_lock
-        printf("Peer requested lock, but still waiting on response\n");
+        printf("Peer %d requested lock, but still waiting on response\n", message->node_id);
         printf("errno: %s\n", strerror(errno));
         peer->peer_request_lock_pending = 1;
       } else { // we did not request a lock
@@ -389,7 +394,8 @@ int handle_peer_message(peer_message_t *message, peer_t *peer) {
 
     case RELEASE_LOCK:
       printf("Received RELEASE_LOCK from peer: %d\n", peer->peer_node_id);
-      dequeue(lock_queue);
+      peer_message_t *msg = dequeue(lock_queue);
+      free(msg);
       printf("Current lock queue:");
       print(lock_queue);
       return 0;
@@ -445,8 +451,8 @@ int handle_request_lock(peer_t *peer) {
   outgoing_message->timestamp = timestamp;
   outgoing_message->key = (char *) calloc(2, sizeof(char));
   outgoing_message->value = (char *) calloc(2, sizeof(char));
-  memcpy(outgoing_message->key, "1", 1);
-  memcpy(outgoing_message->value, "1", 1);
+  strncpy(outgoing_message->key, "1", 2);
+  strncpy(outgoing_message->value, "1", 2);
   outgoing_message->write_type = 0;
 
   send_peer_message(outgoing_message, peer->sock);
@@ -463,53 +469,56 @@ void update_timestamp(uint32_t new_timestamp) {
   pthread_mutex_unlock(&ts_mutex);
 }
 
-int marshall_pm(char **buffer, peer_message_t *message) {
-  memcpy(( *buffer ), &( message->message_type ), sizeof(int));
-  memcpy(( *buffer ) + sizeof(int), &( message->timestamp ), sizeof(int));
-  memcpy(( *buffer ) + sizeof(int) + sizeof(int), &( message->node_id ), sizeof(int));
-  memcpy(( *buffer ) + sizeof(int) + sizeof(int) + sizeof(int), &( message->write_type ),
-         sizeof(int));
-  memcpy(( *buffer ) + sizeof(int) + sizeof(int) + sizeof(int) + sizeof(int), message->key,
-         strlen(message->key));
-  memcpy(( *buffer ) + sizeof(int) + sizeof(int) + sizeof(int) + sizeof(int) + strlen(message->key),
-         " ", 1); // keep space so we can tokenize (k,v) instead of having length field
-  memcpy(
-    ( *buffer ) + sizeof(int) + sizeof(int) + sizeof(int) + sizeof(int) + strlen(message->key) + 1,
-    message->value, strlen(message->value));
-  memcpy(
-    ( *buffer ) + sizeof(int) + sizeof(int) + sizeof(int) + sizeof(int) + strlen(message->key) + 1 +
-    strlen(message->value), "\0", 1);
-  return ( sizeof(int) + sizeof(int) + sizeof(int) + sizeof(int) + strlen(message->key) + 1 +
-           strlen(message->value) + 1 );
+int marshall_pm(char *buffer, peer_message_t *message) {
+  int counter = 0;
+  memcpy(buffer + counter, &( message->message_type ), sizeof(int));
+  counter += sizeof(int);
+  memcpy(buffer + counter, &( message->timestamp ), sizeof(int));
+  counter += sizeof(int);
+  memcpy(buffer + counter, &( message->node_id ), sizeof(int));
+  counter += sizeof(int);
+  memcpy(buffer + counter, &( message->write_type ), sizeof(int));
+  counter += sizeof(int);
+  memcpy(buffer + counter, message->key, strlen(message->key));
+  counter += strlen(message->key);
+  memcpy(buffer + counter, " ", 1); // keep space so we can tokenize (k,v) instead of having length field
+  counter += 1;
+  memcpy(buffer + counter, message->value, strlen(message->value));
+  counter += strlen(message->value);
+  memcpy(buffer + counter, "\0", 1);
+  counter += 1;
+  return counter;
 }
 
 int unmarshall_pm(char *peer_msg_buf, peer_message_t *peer_msg) {
   char *save_ptr = NULL;
+  int counter = 0;
+  memcpy(&( peer_msg->message_type ), peer_msg_buf + counter, sizeof(int));
+  counter += sizeof(int);
+  memcpy(&( peer_msg->timestamp ), peer_msg_buf + counter, sizeof(int));
+  counter += sizeof(int);
+  memcpy(&( peer_msg->node_id ), peer_msg_buf + counter, sizeof(int));
+  counter += sizeof(int);
+  memcpy(&( peer_msg->write_type ), peer_msg_buf + counter, sizeof(int));
+  counter += sizeof(int);
 
-  memcpy(&( peer_msg->message_type ), peer_msg_buf, sizeof(int));
-  memcpy(&( peer_msg->timestamp ), peer_msg_buf + sizeof(int), sizeof(int));
-  memcpy(&( peer_msg->node_id ), peer_msg_buf + 2 * sizeof(int), sizeof(int));
-  memcpy(&( peer_msg->write_type ), peer_msg_buf + 3 * sizeof(int), sizeof(int));
-
-  char *k = strtok_r(peer_msg_buf + 4 * sizeof(int), " ", &save_ptr);
+  char *k = strtok_r(peer_msg_buf + counter, " ", &save_ptr);
   if (k != NULL) {
     peer_msg->key = (char *) calloc(strlen(k), sizeof(char));
     memcpy(peer_msg->key, k, strlen(k));
   }
-
   char *v = strtok_r(NULL, " ", &save_ptr); // should break on  \0
   if (v != NULL) {
     peer_msg->value = (char *) calloc(strlen(v), sizeof(char));
     memcpy(peer_msg->value, v, strlen(v));
   }
-
   return 0;
 }
 
 int send_peer_message(peer_message_t *message, int sock) {
   char *buf = (char *) calloc(MAX_MESSAGE_SIZE, sizeof(char));
-  int numbytes = marshall_pm(&buf, message);
-  if (write(sock, buf, numbytes) != numbytes) {
+  marshall_pm(buf, message);
+  if (write(sock, buf, MAX_MESSAGE_SIZE) != MAX_MESSAGE_SIZE) {
     printf("error during send_peer_message\n");
   }
   free(buf);

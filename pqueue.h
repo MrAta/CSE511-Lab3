@@ -13,7 +13,7 @@
  * Code courtesy of The Crazy Programmer
  * Link: https://www.thecrazyprogrammer.com/2017/06/priority-queue-c-c.html
  */
-#define MAX 30 // was getting alot of overflow/enqueue failed because too small, although i just loop until dist_lock success anyway, but make larger
+#define MAX 50 // was getting alot of overflow/enqueue failed because too small, although i just loop until dist_lock success anyway, but make larger
 
 typedef struct pqueue {
   pqueue_data_t data[MAX];
