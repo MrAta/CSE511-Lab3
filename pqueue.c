@@ -41,6 +41,11 @@ int full(pqueue *p) {
 
 int pqueue_data_cmp(pqueue_data_t first, pqueue_data_t second) {
   if (first->timestamp == second->timestamp) {
+    if (first->node_id > second->node_id) {
+      return 1;
+    } else if (first->node_id < second->node_id) {
+      return -1;
+    }
     return 0;
   } else if (first->timestamp > second->timestamp) {
     return 1;
@@ -64,7 +69,7 @@ int enqueue(pqueue *p, pqueue_data_t x) {
   } else {
     pthread_mutex_lock(mutex);
     i = p->rear;
-    while (pqueue_data_cmp(x, p->data[i]) == 1) {
+    while (pqueue_data_cmp(x, p->data[i]) == -1) {
       p->data[( i + 1 ) % MAX] = p->data[i];
       i = ( i - 1 + MAX ) % MAX; //anticlockwise movement inside the queue
       if (( i + 1 ) % MAX == p->front)
@@ -102,19 +107,19 @@ pqueue_data_t dequeue(pqueue *p) {
 void print(pqueue *p) {
   int i;
   pqueue_data_t x;
-
+  printf("\n");
   if (empty(p)) {
     printf("\nQueue is empty..\n");
   } else {
     i = p->front;
     while (i != p->rear) {
       x = p->data[i];
-      printf("\n%d", x);
+      printf("Key: %s | Value: %s | timestamp: %d | node: %d | message_type: %d\n", x->key, x->value, x->timestamp, x->node_id, x->message_type);
       i = ( i + 1 ) % MAX;
     }
     //prints the last element
     x = p->data[i];
-    printf("\n%d", x);
+    printf("Key: %s | Value: %s | timestamp: %d | node: %d | message_type: %d\n", x->key, x->value, x->timestamp, x->node_id, x->message_type);
   }
 }
 

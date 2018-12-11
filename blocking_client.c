@@ -13,8 +13,10 @@
 
 #include "common.h"
 
-// #define TARGET_ADDR "172.17.0.2"
-#define TARGET_ADDR "127.0.0.1"
+#define TARGET_ADDR1 "172.17.0.2"
+#define TARGET_ADDR2 "172.17.0.3"
+#define TARGET_ADDR3 "172.17.0.4"
+//#define TARGET_ADDR "127.0.0.1"
 // #define PORT 8086
 #define N_KEY 37 //total number of unique keys
 #define a 1.345675 //parameter for zipf distribution to obtain a 90% populariy for 10% of the keys.
@@ -31,7 +33,9 @@ double popularities[N_KEY];
 double cdf[N_KEY];
 int arr_rate = 100;
 int arr_type = 1;
-struct sockaddr_in *serv_addr;
+struct sockaddr_in *serv_addr1;
+struct sockaddr_in *serv_addr2;
+struct sockaddr_in *serv_addr3;
 pthread_mutex_t fp_mutex;
 FILE *fp;
 
@@ -137,7 +141,7 @@ void write_all_keys() {
     exit(0);
   }
 
-  if (connect(sock, (struct sockaddr *) serv_addr, sizeof(struct sockaddr_in)) < 0) {
+  if (connect(sock, (struct sockaddr *) serv_addr1, sizeof(struct sockaddr_in)) < 0) {
     printf("\nConnection Failed \n");
     exit(0);
   }
@@ -166,20 +170,39 @@ void write_all_keys() {
 void *client_func() {
   int seed = time(NULL);
   srand(seed);
-  int sock = 0, valread;
+  int sock1 = 0, sock2 = 0, sock3 = 0, valread;
   char *gbg;
 
   char buffer[MAX_ENTRY_SIZE] = { 0 };
 
-  if (( sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+  if (( sock1 = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
     printf("\n Socket creation error \n");
     exit(0);
   }
 
-  if (connect(sock, (struct sockaddr *) serv_addr, sizeof(struct sockaddr_in)) < 0) {
+  if (connect(sock1, (struct sockaddr *) serv_addr1, sizeof(struct sockaddr_in)) < 0) {
     printf("\nConnection Failed \n");
     exit(0);
   }
+  if (( sock2 = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    printf("\n Socket creation error \n");
+    exit(0);
+  }
+
+  if (connect(sock2, (struct sockaddr *) serv_addr2, sizeof(struct sockaddr_in)) < 0) {
+    printf("\nConnection Failed \n");
+    exit(0);
+  }
+  if (( sock3 = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    printf("\n Socket creation error \n");
+    exit(0);
+  }
+
+  if (connect(sock3, (struct sockaddr *) serv_addr3, sizeof(struct sockaddr_in)) < 0) {
+    printf("\nConnection Failed \n");
+    exit(0);
+  }
+  int socks[3] = { sock1, sock2, sock3 };
   int local_count = 0;
   while (local_count <= (int) ( NUM_OPS / NUM_THREADS )) {
 
@@ -205,11 +228,12 @@ void *client_func() {
 
     struct timeval rtvs, rtve;
     gettimeofday(&rtvs, NULL);
-    send(sock, cmd, strlen(cmd), 0);
-    valread = read(sock, buffer, MAX_ENTRY_SIZE);
+    int nextsock = rand() % 3;
+    send(socks[nextsock], cmd, strlen(cmd), 0);
+    valread = read(socks[nextsock], buffer, MAX_ENTRY_SIZE);
     if (valread == 0) {
       printf("Socket closed\n");
-      close(sock);
+      close(socks[nextsock]);
       return (void *) gbg;
     }
     gettimeofday(&rtve, NULL);
@@ -223,7 +247,9 @@ void *client_func() {
     usleep(nextArrival() * 1000000 * NUM_THREADS);
     local_count++;
   }
-  close(sock);
+  for (int i = 0; i < 3; i++) {
+    close(socks[i]);
+  }
   return (void *) gbg;
 }
 
@@ -239,14 +265,36 @@ int main(int argc, char const *argv[]) {
   calc_cdf();
   printf("Generated popularities.\n");
 
-  serv_addr = (struct sockaddr_in *) malloc(sizeof(struct sockaddr_in));
-  memset(serv_addr, '0', sizeof(serv_addr));
+  serv_addr1 = (struct sockaddr_in *) malloc(sizeof(struct sockaddr_in));
+  memset(serv_addr1, '0', sizeof(serv_addr1));
 
-  serv_addr->sin_family = AF_INET;
-  serv_addr->sin_port = htons(PORT);
+  serv_addr1->sin_family = AF_INET;
+  serv_addr1->sin_port = htons(PORT);
 
   // Convert IPv4 and IPv6 addresses from text to binary form
-  if (inet_pton(AF_INET, TARGET_ADDR, &serv_addr->sin_addr) <= 0) {
+  if (inet_pton(AF_INET, TARGET_ADDR1, &serv_addr1->sin_addr) <= 0) {
+    printf("\nInvalid address/ Address not supported \n");
+    return -1;
+  }
+  serv_addr2 = (struct sockaddr_in *) malloc(sizeof(struct sockaddr_in));
+  memset(serv_addr2, '0', sizeof(serv_addr2));
+
+  serv_addr2->sin_family = AF_INET;
+  serv_addr2->sin_port = htons(PORT);
+
+  // Convert IPv4 and IPv6 addresses from text to binary form
+  if (inet_pton(AF_INET, TARGET_ADDR2, &serv_addr2->sin_addr) <= 0) {
+    printf("\nInvalid address/ Address not supported \n");
+    return -1;
+  }
+  serv_addr3 = (struct sockaddr_in *) malloc(sizeof(struct sockaddr_in));
+  memset(serv_addr3, '0', sizeof(serv_addr3));
+
+  serv_addr3->sin_family = AF_INET;
+  serv_addr3->sin_port = htons(PORT);
+
+  // Convert IPv4 and IPv6 addresses from text to binary form
+  if (inet_pton(AF_INET, TARGET_ADDR3, &serv_addr3->sin_addr) <= 0) {
     printf("\nInvalid address/ Address not supported \n");
     return -1;
   }
