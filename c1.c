@@ -24,7 +24,7 @@ int c1_batch_insert(c0_node *nodes[], int size) {
   // LOCAL VARIABLES
   //
   //
-  int fd, oldfd = 0, rc;
+  int fd, oldfd = 0;
   char *filename;
   char *keyval;
   asprintf(&filename, "%s/%d", DB_DIR, ++file_counter);
@@ -43,8 +43,8 @@ int c1_batch_insert(c0_node *nodes[], int size) {
   for (int i = 0; i < size; i++) {
     keyval = calloc(LINE_SIZE, 1);
 
-    if (( rc = snprintf(keyval, (int) LINE_SIZE, "%s %s %d\n", nodes[i]->key,
-                        nodes[i]->value, nodes[i]->flag)) == -1) {
+    if (( snprintf(keyval, (int) LINE_SIZE, "%s %s %d\n", nodes[i]->key,
+                   nodes[i]->value, nodes[i]->flag)) == -1) {
       close(fd);
       fprintf(stderr, "Failed to create db entry\n");
       return -1;
@@ -266,6 +266,7 @@ char *c1_get(char *key) {
   free(fname);
   if (file == NULL) {
     fprintf(stderr, "Failed to open current counter file\n");
+    printf("errno: %s\n", strerror(errno));
     return NULL;
   }
   fseek(file, 0, SEEK_END);

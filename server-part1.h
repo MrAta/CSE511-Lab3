@@ -20,15 +20,28 @@
 #include <time.h>
 #include <errno.h>
 #include "c1.h"
- #include "abd.h"
+#include "abd.h"
+#include "blocking_node.h"
 
 #define PORT 8086
+#define PEER_PORT 8087
 #define QUEUED_CONNECTIONS 5
+
+typedef enum {
+    GET,
+    PUT,
+    INSERT,
+    DELETE
+} write_type_t;
 
 #define CACHE_SIZE 101
 
 extern c0_node * _T;
 extern struct sockaddr_in address;
+
+/* For part 2, making these available for server-main.c */
+extern int blocking; // declared in server-part1.c
+extern uint32_t node_id; // declared in blocking_node.c
 
 int create_server_1();
 
@@ -46,7 +59,7 @@ int loop_and_listen_1();
  * @param blocking 1 if run the servers with ABD protocol
  * @return 0 if success 1 if failure
  */
-int run_server_1(int make_blocking);
+int run_server_1(int num_peer_args, char *peer_list[]);
 
 /**
  * Setup signal mask for helper threads (blocking handler) then call server helper
@@ -59,6 +72,11 @@ void *setup_sigs_and_exec_handler(void *arg);
  * Thread handler for the server upon accepting a new connection
  */
 void server_handler(void *arg);
+
+/**
+ * Thread handler for the PART 2 BLOCKING server upon accepting a new connection
+ */
+void server_handler_blocking(void *arg);
 
 /**
  * Handles the PUT request on the server

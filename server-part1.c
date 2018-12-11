@@ -7,7 +7,7 @@
 
 #define CLOCKID CLOCK_REALTIME
 #define SIG (SIGRTMIN + 3)
-#define TIMER_FREQ_S 5 // change this back
+#define TIMER_FREQ_S 10 // change this back
 // #define C0_SIZE_TRSH 4
 #define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
                         } while (0)
@@ -113,7 +113,7 @@ int server_1_put_request(char *key, char *value, char **ret_buffer, int *ret_siz
 }
 
 int server_1_put_request_abd(char *key, char *value, abd_tag_t *tag, char **response,
-                              int *response_size) {
+                             int *response_size) {
   //
   //
   // LOCAL VARIABLES
@@ -128,11 +128,11 @@ int server_1_put_request_abd(char *key, char *value, abd_tag_t *tag, char **resp
     // TODO: Handle Error
     exit(1);
   }
-  sscanf(search_buffer, "%s %d %d", value, &search_tag.tag, &search_tag.client_id);
+  sscanf(search_buffer, "%s %d %d", value, &search_tag.timestamp, &search_tag.client_id);
   if (abd_tag_cmp(tag, &search_tag) == 1) {
     // Make value change
     free(search_buffer);
-    snprintf(new_value, MAX_VALUE_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", value, tag->tag,
+    snprintf(new_value, MAX_VALUE_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", value, tag->timestamp,
              tag->client_id);
     return server_1_put_request(key, new_value, response, response_size);
   }
@@ -184,7 +184,7 @@ int server_1_insert_request(char *key, char *value, char **ret_buffer, int *ret_
 }
 
 int server_1_insert_request_abd(char *key, char *value, abd_tag_t *tag, char **response,
-                                 int *response_size) {
+                                int *response_size) {
   //
   //
   // LOCAL VARIABLES
@@ -199,11 +199,12 @@ int server_1_insert_request_abd(char *key, char *value, abd_tag_t *tag, char **r
     // TODO: Handle Error
     exit(1);
   }
-  sscanf(search_buffer, "%s %d %d", value, &search_tag.tag, &search_tag.client_id);
+  sscanf(search_buffer, "%s %d %d", value, &search_tag.timestamp, &search_tag.client_id);
   if (abd_tag_cmp(tag, &search_tag) == 1) {
     // Make value change
     free(search_buffer);
-    snprintf(new_value, MAX_VALUE_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", value, tag->tag, tag->client_id);
+    snprintf(new_value, MAX_VALUE_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", value, tag->timestamp,
+             tag->client_id);
     return server_1_insert_request(key, new_value, response, response_size);
   }
   // Send Ack to client
@@ -261,7 +262,11 @@ void *setup_sigs_and_exec_handler(void *arg) {
   sigaddset(&mask1, SIG); // block this always
   pthread_sigmask(SIG_BLOCK, &mask1, NULL);
 
-  server_handler(arg);
+  if (blocking) {
+    server_handler_blocking(arg);
+  } else {
+    server_handler(arg);
+  }
 }
 
 void server_handler(void *arg) {
@@ -273,9 +278,9 @@ void server_handler(void *arg) {
   transaction txn;
   // int re = 0;
   // while (re = read(sockfd, input_line, MAX_ENTRY_SIZE)) {
-  while (read(sockfd, input_line, MAX_ENTRY_SIZE) > 0) { // stop if connection closed by peer
+  while (read(sockfd, input_line, MAX_ENTRY_SIZE) > 0) { // stop if connection closed by client
     // db_connect();
-    if (!blocking) {
+    // if (!blocking) {
       strncpy(copy_input_line, input_line, MAX_ENTRY_SIZE);
       tokens = strtok_r(input_line, " ", &save_ptr);
       char *key = strtok_r(NULL, " ", &save_ptr);
@@ -284,8 +289,9 @@ void server_handler(void *arg) {
       char *client_id = strtok_r(NULL, " ", &save_ptr);
       abd_tag_t rec_tag = { atoi(tag), atoi(client_id) };
       if (tokens == NULL || key == NULL || tag == NULL || client_id == NULL) {
+      // if (tokens == NULL || key == NULL) {
         printf("Invalid key/command/tag/client-id received (server-part-1)\n");
-        printf("errno: %s\n", strerror(errno)); // "errno: Connection reset by peer"
+        // printf("errno: %s\n", strerror(errno)); // "errno: Connection reset by peer"
         write(sockfd, "BAD BOI", 8);
       } else if (strncmp(tokens, "GET", 3) == 0) {
         server_1_get_request(key, &response, &response_size);
@@ -294,20 +300,21 @@ void server_handler(void *arg) {
         txn.db.data = copy_input_line;
         txn.db.data_len = strlen(copy_input_line);
         while (log_transaction(&txn) != 0);
+        // server_1_put_request(key, value, &response, &response_size);
         server_1_put_request_abd(key, value, &rec_tag, &response, &response_size);
-//        server_1_put_request(key, value, &response, &response_size);
         write(sockfd, response, (size_t) response_size);
       } else if (strncmp(tokens, "INSERT", 6) == 0) {
         txn.db.data = copy_input_line;
         txn.db.data_len = strlen(copy_input_line);
         while (log_transaction(&txn) != 0);
+        // server_1_insert_request(key, value, &response, &response_size);
         server_1_insert_request_abd(key, value, &rec_tag, &response, &response_size);
-//        server_1_insert_request(key, value, &response, &response_size);
         write(sockfd, "OK", 2);
       } else if (strncmp(tokens, "DELETE", 6) == 0) {
         txn.db.data = copy_input_line;
         txn.db.data_len = strlen(copy_input_line);
         while (log_transaction(&txn) != 0);
+        // server_1_delete_request(key, &response, &response_size);
         server_1_delete_request_abd(key, &rec_tag, &response, &response_size);
         write(sockfd, response, (size_t) response_size);
       } else {
@@ -323,7 +330,95 @@ void server_handler(void *arg) {
       input_line = (char *) calloc(MAX_ENTRY_SIZE, sizeof(char *));
       copy_input_line = (char *) calloc(MAX_ENTRY_SIZE, sizeof(char *));
       response = NULL;
-    }
+    // }
+  }
+  free(arg);
+  free(input_line);
+  free(copy_input_line);
+  input_line = NULL;
+  close(sockfd);
+  return NULL;
+}
+
+void server_handler_blocking(void *arg) {
+  int sockfd = *(int *) arg;
+  char *input_line = (char *) calloc(MAX_ENTRY_SIZE, sizeof(char));
+  char *copy_input_line = (char *) calloc(MAX_ENTRY_SIZE, sizeof(char));
+  char *tokens, *response = NULL, *save_ptr;
+  int response_size;
+  transaction txn;
+  // int re = 0;
+  // while (re = read(sockfd, input_line, MAX_ENTRY_SIZE)) {
+  while (read(sockfd, input_line, MAX_ENTRY_SIZE) > 0) { // stop if connection closed by peer
+    // db_connect();
+    // if (!blocking) {
+      strncpy(copy_input_line, input_line, MAX_ENTRY_SIZE);
+      tokens = strtok_r(input_line, " ", &save_ptr);
+      char *key = strtok_r(NULL, " ", &save_ptr);
+      char *value = strtok_r(NULL, " ", &save_ptr);
+      // char *tag = strtok_r(NULL, " ", &save_ptr);
+      // char *client_id = strtok_r(NULL, " ", &save_ptr);
+      // abd_tag_t rec_tag = { atoi(tag), atoi(client_id) };
+      // if (tokens == NULL || key == NULL || tag == NULL || client_id == NULL) {
+      if (tokens == NULL || key == NULL) {
+        printf("Invalid key/command/tag/client-id received (server-part-1)\n");
+        printf("errno: %s\n", strerror(errno)); // "errno: Connection reset by peer"
+        write(sockfd, "BAD BOI", 8);
+      } else if (strncmp(tokens, "GET", 3) == 0) { // all servers synchronized, just read from local db
+        server_1_get_request(key, &response, &response_size);
+        write(sockfd, response, (size_t) response_size);
+      } else if (strncmp(tokens, "PUT", 3) == 0) {
+        while (distributed_lock() != 0); // acquire distributed lock // TODO: what to do if failed acquiring lock? keep spinning?
+        printf("[acquired dist_lock]\n");
+        txn.db.data = copy_input_line;
+        txn.db.data_len = strlen(copy_input_line);
+        while (log_transaction(&txn) != 0);
+        server_1_put_request(key, value, &response, &response_size);
+        // server_1_put_request_abd(key, value, &rec_tag, &response, &response_size);
+        while (broadcast_write(key, value, PUT) != 0); // only can be done if we have lock, which we do
+        while (distributed_unlock() != 0);
+        printf("[released dist_lock]\n");
+        // server_1_put_request(key, value, &response, &response_size);
+        write(sockfd, response, (size_t) response_size);
+      } else if (strncmp(tokens, "INSERT", 6) == 0) {
+        while (distributed_lock() != 0);
+        printf("[acquired dist_lock]\n");
+        txn.db.data = copy_input_line;
+        txn.db.data_len = strlen(copy_input_line);
+        while (log_transaction(&txn) != 0);
+        server_1_insert_request(key, value, &response, &response_size);
+        // server_1_insert_request_abd(key, value, &rec_tag, &response, &response_size);
+        while (broadcast_write(key, value, INSERT) != 0); // only can be done if we have lock, which we do
+        while (distributed_unlock() != 0);
+        printf("[released dist_lock]\n");
+        // server_1_insert_request(key, value, &response, &response_size);
+        write(sockfd, "OK", 2);
+      } else if (strncmp(tokens, "DELETE", 6) == 0) {
+        while (distributed_lock() != 0);
+        printf("[acquired dist_lock]\n");
+        txn.db.data = copy_input_line;
+        txn.db.data_len = strlen(copy_input_line);
+        while (log_transaction(&txn) != 0);
+        server_1_delete_request(key, &response, &response_size);
+        // server_1_delete_request_abd(key, &rec_tag, &response, &response_size);
+        while (broadcast_write(key, value, DELETE) != 0); // only can be done if we have lock, which we do
+        while (distributed_unlock() != 0);
+        printf("[released dist_lock]\n");
+        write(sockfd, response, (size_t) response_size);
+      } else {
+        write(sockfd, "ERROR", 6);
+      }
+      // db_cleanup();
+      if (response != NULL) {
+        free(response);
+      }
+      free(input_line);
+      free(copy_input_line);
+      input_line = NULL;
+      input_line = (char *) calloc(MAX_ENTRY_SIZE, sizeof(char *));
+      copy_input_line = (char *) calloc(MAX_ENTRY_SIZE, sizeof(char *));
+      response = NULL;
+    // }
   }
   free(arg);
   free(input_line);
@@ -372,7 +467,7 @@ int loop_and_listen_1() {
   while (1) {
     socklen_t cli_addr_size = sizeof(address);
     int newsockfd = accept(sock_fd, (struct sockaddr *) &address, &cli_addr_size);
-    printf("Got new connection\n");
+    printf("Got new client connection\n");
     if (newsockfd < 0) {
       perror("Could not accept connection");
       continue;
@@ -387,7 +482,7 @@ int loop_and_listen_1() {
   }
 }
 
-int run_server_1(int make_blocking) {
+int run_server_1(int num_peer_args, char *peer_list[]) {
   // Load database
   head = tail = temp_node = NULL;
   // _T = NULL;
@@ -425,8 +520,32 @@ int run_server_1(int make_blocking) {
 
   c1_init();
 
-  blocking = make_blocking;
-  if (loop_and_listen_1()) {
+  // blocking = make_blocking; // set in server-main.c
+
+  if (blocking) {
+    if (initialize_blocking_node() != 0) { return EXIT_FAILURE; }
+    pthread_t *peer_handler_thread = (pthread_t *) malloc(sizeof(pthread_t));
+    int *p = (int *)calloc(4, sizeof(char));
+    *p = PEER_PORT;
+    if (pthread_create(peer_handler_thread, NULL, listen_peer_connections, (void *) p) != 0) { // *** begin listening for peer connections
+        perror("Could not begin listening for peers:");
+        return EXIT_FAILURE;
+    }
+
+    if (num_peer_args == 0) {
+      printf("No peers specified to connect to.\n");
+    }
+
+    for (int i = 0; i < num_peer_args; i++) {
+      if (connect_peer(peer_list[i], atoi(peer_list[i + 1])) == 0) {
+        // printf("Connected to peer: [%s:%s]\n", peer_list[i], peer_list[i + 1]);
+      } else {
+        // printf("Could not connect to peer: [%s:%s]\n", peer_list[i], peer_list[i + 1]);
+      }
+      i++;
+    }
+  }
+  if (loop_and_listen_1()) { // *** begin listening for client connections
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
