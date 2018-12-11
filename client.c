@@ -267,7 +267,7 @@ void *send_abd_read_query(void * arg){
 
    char *new_s = calloc(MAX_ENTRY_SIZE + MAX_TAG_SIZE + 3, sizeof(char));
    //write key , htag->value, htag->tag->tag, htag->tag->client-id
-   snprintf(new_s, MAX_ENTRY_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", "-", _arg->tag->tag, _arg->tag->client_id);
+   snprintf(new_s, MAX_ENTRY_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", "-", _arg->tag->timestamp, _arg->tag->client_id);
 
    strcat(cmd, new_s);   //read response
 
@@ -289,8 +289,8 @@ void *send_abd_read_query(void * arg){
    v = strtok_r(req_str, " ", &save_ptr);
    strcpy(_arg->value, v);
    abd_tag_t * tag = malloc(sizeof(*tag));
-   tag->tag = atoi(strtok_r(req_str, " ", &save_ptr));
-   tag->client_id = atoi(strtok_r(req_str, " ", &save_ptr));
+   tag->timestamp = (uint32_t) atoi(strtok_r(req_str, " ", &save_ptr));
+   tag->client_id = (uint32_t) atoi(strtok_r(req_str, " ", &save_ptr));
    if(abd_tag_cmp(tag, _arg->tag)){
         _arg->tag = tag;
       }
@@ -310,7 +310,7 @@ abd_arg * abd_read_query(char *key){
   arg->value = (char*)malloc(MAX_ENTRY_SIZE * sizeof(char));
   arg->tag = malloc(sizeof(abd_tag_t));
   arg->tag->client_id = CLIENT_ID;
-  arg->tag->tag = 0;
+  arg->tag->timestamp = 0;
   for (int i=0; i < NUM_NODES; i++){
       pthread_mutex_lock(&lrq_m);
       arg->node_id = i; //TODO: other way to pass node_id
@@ -403,7 +403,7 @@ void abd_read(char *key){
   abd_arg * htag = abd_read_query(key);
   char *new_value = calloc(MAX_ENTRY_SIZE + MAX_TAG_SIZE + 3, sizeof(char));
   //write key , htag->value, htag->tag->tag, htag->tag->client-id
-  snprintf(new_value, MAX_ENTRY_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", htag->value, htag->tag->tag, htag->tag->client_id);
+  snprintf(new_value, MAX_ENTRY_SIZE + MAX_TAG_SIZE + 3, "%s %d %d\n", htag->value, htag->tag->timestamp, htag->tag->client_id);
   //now write "key value tag" to all servers!
   abd_write_query(key, new_value);
 
