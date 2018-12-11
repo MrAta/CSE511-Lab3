@@ -3,6 +3,7 @@
 //
 
 #include "client_common.h"
+
 int nextReqType() {
   double p = (rand() / (RAND_MAX+1.0));
   //req types: 0 indicates get request, 1 indicates put request

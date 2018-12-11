@@ -7,12 +7,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include "../data_types.h"
 /**
  * Code courtesy of The Crazy Programmer
  * Link: https://www.thecrazyprogrammer.com/2017/06/priority-queue-c-c.html
  */
 #define MAX 30
-typedef int pqueue_data_t;
 
 typedef struct pqueue {
   pqueue_data_t data[MAX];
@@ -21,9 +22,16 @@ typedef struct pqueue {
 
 /**
  * Instantiates a priority queue in the provided parameter
+ * NOTE: This function is not thread safe
  * @param p Allocated reference to a pqueue
  */
 void initialize(pqueue *p);
+
+/**
+ * Resets the priority queue to the initial state.
+ * NOTE: This function is not thread safe
+ */
+void reset(pqueue *p);
 
 /**
  * Returns 1 if queue is empty, else returns 0
@@ -50,6 +58,11 @@ pqueue_data_t dequeue(pqueue *p);
  * Debugging function to print out all elements in the queue
  */
 void print(pqueue *p);
+
+/**
+ * Returns the next element in the queue without removing it.
+ */
+pqueue_data_t peek(pqueue *p);
 
 /******* DATA TYPE FUNCTIONS *******/
 
