@@ -124,10 +124,12 @@ int server_1_put_request_abd(char *key, char *value, abd_tag_t *tag, char **resp
   abd_tag_t search_tag;
   char *new_value = calloc(MAX_VALUE_SIZE + MAX_TAG_SIZE + 3, sizeof(char));
   // Search for current tag in DB.
+
   if (server_1_get_request(key, &search_buffer, &search_buf_size)) {
     // TODO: Handle Error
     exit(1);
   }
+
   sscanf(search_buffer, "%s %d %d", value, &search_tag.tag, &search_tag.client_id);
   if (abd_tag_cmp(tag, &search_tag) == 1) {
     // Make value change
@@ -282,6 +284,7 @@ void server_handler(void *arg) {
       char *value = strtok_r(NULL, " ", &save_ptr);
       char *tag = strtok_r(NULL, " ", &save_ptr);
       char *client_id = strtok_r(NULL, " ", &save_ptr);
+      printf("ATA: %s %s %s %s %s \n",tokens, key, value, tag, client_id);
       abd_tag_t rec_tag = { atoi(tag), atoi(client_id) };
       if (tokens == NULL || key == NULL || tag == NULL || client_id == NULL) {
         printf("Invalid key/command/tag/client-id received (server-part-1)\n");

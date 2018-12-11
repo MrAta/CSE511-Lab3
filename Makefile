@@ -1,9 +1,9 @@
 LINK=gcc
 CC=gcc
-CFLAGS=-c -g3 -ggdb -std=gnu99 -fPIC -Wall -I. -I/opt/local/include -I./libapr/include/apr-2
-LINKFLAGS=-L. -g3 -ggdb -std=gnu99 -pthread -L/opt/local/lib -L./libapr/lib
+CFLAGS=-c -g3 -ggdb -std=gnu99 -fPIC -Wall -I. #-I/opt/local/include -I./libapr/include/apr-2
+LINKFLAGS=-L. -g3 -ggdb -std=gnu99 -pthread #-L/opt/local/lib -L./libapr/lib
 LIBFLAGS=-shared -Wall -pthread
-LINKLIBS=-lm -lrt -lds -lapr-2
+LINKLIBS=-lm -lrt #-lds -lapr-2
 ARCHIVE=ar
 TARGETS=server client client_blocking
 OBJECTS= server-main.o \
@@ -36,8 +36,8 @@ libds.a: $(LIBDS_OBJS)
 	$(ARCHIVE) rc $@ $^
 	$(ARCHIVE) s $@ $^
 
-client: client.c
-	gcc -g -std=gnu99 client.c -o client -pthread -lm
+client: client.c abd.c
+	gcc -g -std=gnu99 abd.c client.c -o client -pthread -lm
 
 client_blocking: blocking_node.o $(LIBS)
 	$(LINK) $(LINKFLAGS) $^ $(LINKLIBS) -o $@
