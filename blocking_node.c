@@ -7,6 +7,10 @@
 #include "journal.h"
 
 // GLOBAL VARIABLES
+typedef struct {
+  int requested_lock;
+  int timestamp_last_req;
+} requested_lock_metadata_t;
 int peer_index;
 peer_t peers[MAX_PEERS];
 pqueue *lock_queue;
@@ -17,7 +21,8 @@ pthread_mutex_t lp_mutex;
 uint32_t node_id = 0;
 int replies_received = 0;
 int REPLIES_QUORUM = 2;
-int requested_lock = 0;
+requested_lock_metadata_t requests[MAX_PEERS];
+//int requested_lock = 0;
 
 int initialize_blocking_node() {
   // Create and initialize lock priority queue
@@ -283,7 +288,6 @@ int distributed_lock() {
   printf("Current lock queue:");
   print(lock_queue);
   pthread_mutex_lock(m_mutex);
-  requested_lock = 1;
   for (int i = 0; i < MAX_PEERS; i++) {
     if (!peers[i].valid) {
       continue;
@@ -293,6 +297,9 @@ int distributed_lock() {
       pthread_mutex_unlock(m_mutex);
       return -1;
     }
+    requests[i].requested_lock = 1;
+    requests[i].timestamp_last_req = timestamp;
+//    requested_lock = 1;
     printf("Sent REQUEST_LOCK to peer: %d\n", peers[i].peer_node_id);
   }
 
@@ -300,7 +307,7 @@ int distributed_lock() {
     pthread_mutex_lock(&lp_mutex);
     if (replies_received >= REPLIES_QUORUM) { // must receive replies from all peers
       replies_received = 0; // reset for next thread
-      requested_lock = 0; // reset for next thread; protected by m_mutex
+//      requested_lock = 0; // reset for next thread; protected by m_mutex
       pthread_mutex_unlock(&lp_mutex);
       break;
     }
@@ -379,7 +386,9 @@ int handle_peer_message(peer_message_t *message, peer_t *peer) {
       printf("Current lock queue:");
       print(lock_queue);
       pthread_mutex_lock(&lp_mutex);
-      if (requested_lock) { // block any request_lock until we receive all reply_lock
+      if (requests[peer->peer_node_id].requested_lock &&
+          requests[peer->peer_node_id].timestamp_last_req <
+          message->timestamp) { // block any earlier request_lock from us until we receive all reply_lock
         printf("Peer %d requested lock, but still waiting on response\n", message->node_id);
         printf("errno: %s\n", strerror(errno));
         peer->peer_request_lock_pending = 1;
@@ -408,6 +417,7 @@ int handle_peer_message(peer_message_t *message, peer_t *peer) {
         peer->peer_request_lock_pending = 0;
         printf("Sent REPLY_LOCK to peer: %d\n", peer->peer_node_id);
       }
+      requests[peer->peer_node_id].requested_lock = 0;
       replies_received++;
       pthread_mutex_unlock(&lp_mutex);
       printf("Current lock queue:");
@@ -481,7 +491,8 @@ int marshall_pm(char *buffer, peer_message_t *message) {
   counter += sizeof(int);
   memcpy(buffer + counter, message->key, strlen(message->key));
   counter += strlen(message->key);
-  memcpy(buffer + counter, " ", 1); // keep space so we can tokenize (k,v) instead of having length field
+  memcpy(buffer + counter, " ",
+         1); // keep space so we can tokenize (k,v) instead of having length field
   counter += 1;
   memcpy(buffer + counter, message->value, strlen(message->value));
   counter += strlen(message->value);
